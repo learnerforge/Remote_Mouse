@@ -1,12 +1,14 @@
 """One-command launcher for TouchMorph.
 
-Builds the client (if needed) and starts the server.
-Run: python start.py
+Quick start:
+  python start.py
+
+First-time setup wizard:
+  python setup.py
 """
 
 import subprocess
 import sys
-import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent

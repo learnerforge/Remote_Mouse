@@ -32,11 +32,15 @@ sequenceDiagram
         Server-->>Client: pair:error { message }
     end
     Client->>Server: mode:switch { mode }
-    Server-->>Client: mode:switched { mode }
+    Server-->>Client: mode:switched { mode, screenWidth, screenHeight }
     loop Control
-        Client->>Server: mouse:event / touchpad:event / click:* / scroll
+        Client->>Server: mouse:event / touchpad:event / airmouse:move
+        Client->>Server: gesture:start/move/end / presentation:action
+        Client->>Server: media:action / smartscroll:start/move/end
+        Client->>Server: system:action / screen:info / click:* / scroll
     end
     Client->>Server: ping (heartbeat, volatile)
+    Server-->>Client: server:shutdown (on server stop)
     Client->>Server: disconnect
 ```
 
@@ -96,7 +100,7 @@ Submit a pairing code to establish the device as the active controller.
 
 #### `mode:switch`
 
-Switch between mouse and touchpad mode.
+Switch between available input modes.
 
 **Payload:**
 
@@ -108,9 +112,9 @@ Switch between mouse and touchpad mode.
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `mode` | string | Yes | Either `"mouse"` or `"touchpad"`. |
+| `mode` | string | Yes | One of: `"mouse"`, `"touchpad"`, `"airmouse"`, `"presentation"`, `"media"`. |
 
-**Server response:** `mode:switched`
+**Server response:** `mode:switched` (now includes `screenWidth` and `screenHeight`)
 
 ---
 
@@ -253,6 +257,242 @@ Heartbeat ping to keep the connection alive. Sent as a **volatile** event every 
 
 ---
 
+#### `mouse:event` — drag
+
+Initiates or ends a drag-and-drop operation. Hold mode keeps the button pressed while moving.
+
+**Payload — hold:**
+
+```json
+{
+  "type": "hold"
+}
+```
+
+**Payload — release:**
+
+```json
+{
+  "type": "release"
+}
+```
+
+**Payload — drag move:**
+
+```json
+{
+  "type": "drag",
+  "x": 500,
+  "y": 300
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `type` | string | Yes | `"hold"`, `"release"`, or `"drag"` |
+| `x` | number | For drag | Absolute X coordinate |
+| `y` | number | For drag | Absolute Y coordinate |
+
+---
+
+#### `gesture:start` / `gesture:move` / `gesture:end`
+
+Multi-touch gesture tracking for advanced gestures (pinch, n-finger swipe, long-press, shake).
+
+**Payload — start:**
+
+```json
+{
+  "touches": [{ "id": 0, "x": 100, "y": 200 }]
+}
+```
+
+**Payload — move:**
+
+```json
+{
+  "touches": [{ "id": 0, "x": 150, "y": 250 }, { "id": 1, "x": 300, "y": 400 }]
+}
+```
+
+**Payload — end:**
+
+```json
+{
+  "touches": []
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `touches` | array | Yes | Array of touch objects, each with `id` (int), `x` (number), `y` (number) |
+
+---
+
+#### `gesture:n_finger_swipe`
+
+Detected multi-finger swipe from the gesture processor.
+
+```json
+{
+  "direction": "right",
+  "fingerCount": 3
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `direction` | string | Yes | `"up"`, `"down"`, `"left"`, or `"right"` |
+| `fingerCount` | number | Yes | Number of fingers detected (2, 3, 4+) |
+
+**Server-side mapping:** 2F swipe → right-click, 3F swipe → double-click, 4F+ swipe → alt-tab / task view.
+
+---
+
+#### `airmouse:move`
+
+Gyroscope-based pointer movement (Air Mouse mode).
+
+**Payload:**
+
+```json
+{
+  "alpha": 45.2,
+  "beta": 12.8,
+  "gamma": -3.1
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `alpha` | number | No | Device orientation alpha (compass heading) |
+| `beta` | number | Yes | Device orientation beta (front-back tilt, degrees) |
+| `gamma` | number | Yes | Device orientation gamma (left-right tilt, degrees) |
+
+---
+
+#### `presentation:action`
+
+Slide navigation and presentation control.
+
+**Payload:**
+
+```json
+{
+  "action": "next"
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `action` | string | Yes | `"next"`, `"prev"`, `"black"`, `"white"`, `"start"`, `"escape"`, `"first"`, `"pointer"` |
+
+**Action mapping:** `next` → Page Down, `prev` → Page Up, `black` → B key, `white` → W key, `start` → F5, `escape` → Esc, `first` → Home, `pointer` → holds left click (laser pointer mode).
+
+---
+
+#### `media:action`
+
+Media playback controls.
+
+**Payload:**
+
+```json
+{
+  "action": "play_pause"
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `action` | string | Yes | `"play_pause"`, `"next"`, `"prev"`, `"vol_up"`, `"vol_down"`, `"mute"` |
+
+---
+
+#### `smartscroll:start` / `smartscroll:move` / `smartscroll:end`
+
+Smart Scroll mode (used by Touchpad mode for momentum scrolling).
+
+**Payload — start:**
+
+```json
+{
+  "touchId": 0,
+  "x": 100,
+  "y": 200
+}
+```
+
+**Payload — move:**
+
+```json
+{
+  "touchId": 0,
+  "x": 150,
+  "y": 180
+}
+```
+
+**Payload — end:**
+
+```json
+{
+  "touchId": 0
+}
+```
+
+---
+
+#### `smartscroll:config`
+
+Configure Smart Scroll parameters.
+
+**Payload:**
+
+```json
+{
+  "sensitivity": 1.0,
+  "naturalScroll": false,
+  "decay": 0.92
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `sensitivity` | number | No | Scroll sensitivity multiplier (default 1.0) |
+| `naturalScroll` | boolean | No | Natural (reverse) scroll direction (default false) |
+| `decay` | number | No | Momentum decay rate (0.0–1.0, default 0.92) |
+
+---
+
+#### `system:action`
+
+System-level keyboard shortcuts.
+
+**Payload:**
+
+```json
+{
+  "action": "alt_tab"
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `action` | string | Yes | `"alt_tab"`, `"task_view"`, `"show_desktop"`, `"lock_screen"`, `"copy"`, `"paste"`, `"cut"`, `"undo"`, `"redo"`, `"select_all"`, `"save"`, `"find"`, `"esc"`, `"enter"`, `"fullscreen"` |
+
+---
+
+#### `screen:info`
+
+Request server screen dimensions (returns same data as `mode:switched`).
+
+**Payload:** None
+
+**Server response:** `screen:info` (see Server → Client events)
+
+---
+
 ### Server → Client Events
 
 #### `session:created`
@@ -261,13 +501,17 @@ Sent when a new session is created (no valid token provided on connect).
 
 ```json
 {
-  "token": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+  "token": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "screenWidth": 1920,
+  "screenHeight": 1080
 }
 ```
 
 | Field | Type | Description |
 |-------|------|-------------|
 | `token` | string | The new session UUID. Must be saved to localStorage. |
+| `screenWidth` | number | Total screen width in pixels (all monitors) |
+| `screenHeight` | number | Total screen height in pixels |
 
 ---
 
@@ -279,7 +523,9 @@ Sent when an existing session is successfully restored.
 {
   "token": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
   "paired": true,
-  "mode": "touchpad"
+  "mode": "touchpad",
+  "screenWidth": 1920,
+  "screenHeight": 1080
 }
 ```
 
@@ -287,7 +533,9 @@ Sent when an existing session is successfully restored.
 |-------|------|-------------|
 | `token` | string | The session UUID (may be refreshed by server) |
 | `paired` | boolean | Whether the device was already paired |
-| `mode` | string | Last used mode: `"mouse"` or `"touchpad"` |
+| `mode` | string | Last used mode: `"mouse"`, `"touchpad"`, `"airmouse"`, `"presentation"`, or `"media"` |
+| `screenWidth` | number | Total screen width in pixels |
+| `screenHeight` | number | Total screen height in pixels |
 
 ---
 
@@ -335,19 +583,55 @@ The client should clear the code input and allow the user to retry.
 
 ---
 
-#### `mode:switched`
+#### `screen:info`
 
-Confirms the mode switch requested via `mode:switch`.
+Server response to `screen:info` request or emitted on connect/session restore.
 
 ```json
 {
-  "mode": "touchpad"
+  "screenWidth": 1920,
+  "screenHeight": 1080
 }
 ```
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `mode` | string | The confirmed mode: `"mouse"` or `"touchpad"` |
+| `screenWidth` | number | Total screen width in pixels (all monitors) |
+| `screenHeight` | number | Total screen height in pixels |
+
+---
+
+#### `server:shutdown`
+
+Emitted to all connected clients when the server begins graceful shutdown. Clients should save state and prepare for disconnect.
+
+```json
+{
+  "message": "Server is shutting down"
+}
+```
+
+**Client behavior:** Save session token, show "Server offline" message, disable controls.
+
+---
+
+#### `mode:switched`
+
+Confirms the mode switch requested via `mode:switch`. Now includes screen dimensions for Air Mouse absolute positioning.
+
+```json
+{
+  "mode": "touchpad",
+  "screenWidth": 1920,
+  "screenHeight": 1080
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `mode` | string | The confirmed mode: `"mouse"`, `"touchpad"`, `"airmouse"`, `"presentation"`, or `"media"` |
+| `screenWidth` | number | Total screen width in pixels (all monitors) |
+| `screenHeight` | number | Total screen height in pixels |
 
 ---
 
@@ -362,6 +646,13 @@ flowchart LR
         MS["mode:switch"]
         ME["mouse:event"]
         TE["touchpad:event"]
+        AM["airmouse:move"]
+        GA["gesture:start/move/end"]
+        PA["presentation:action"]
+        MA["media:action"]
+        SS["smartscroll:start/move/end"]
+        SY["system:action"]
+        SI["screen:info"]
         CL["click:left"]
         CR["click:right"]
         CD["click:double"]
@@ -375,6 +666,8 @@ flowchart LR
         PS["pair:success"]
         PE["pair:error"]
         MSw["mode:switched"]
+        SIn["screen:info"]
+        SSh["server:shutdown"]
     end
 
     SR --> SCr
@@ -383,6 +676,7 @@ flowchart LR
     PV --> PS
     PV --> PE
     MS --> MSw
+    SI --> SIn
 
     style CL fill:#1e293b,stroke:#818cf8,color:#e2e8f0
     style CR fill:#1e293b,stroke:#818cf8,color:#e2e8f0
@@ -390,6 +684,13 @@ flowchart LR
     style SC fill:#1e293b,stroke:#818cf8,color:#e2e8f0
     style ME fill:#1e293b,stroke:#34d399,color:#e2e8f0
     style TE fill:#1e293b,stroke:#34d399,color:#e2e8f0
+    style AM fill:#1e293b,stroke:#34d399,color:#e2e8f0
+    style GA fill:#1e293b,stroke:#34d399,color:#e2e8f0
+    style PA fill:#1e293b,stroke:#34d399,color:#e2e8f0
+    style MA fill:#1e293b,stroke:#34d399,color:#e2e8f0
+    style SS fill:#1e293b,stroke:#34d399,color:#e2e8f0
+    style SY fill:#1e293b,stroke:#34d399,color:#e2e8f0
+    style SI fill:#1e293b,stroke:#34d399,color:#e2e8f0
     style PI fill:#1e293b,stroke:#64748b,color:#e2e8f0
     style SR fill:#818cf8,stroke:#4338ca,color:#fff
     style PR fill:#f59e0b,stroke:#d97706,color:#fff
@@ -422,6 +723,21 @@ The TouchMorph admin dashboard. Returns an HTML page with device monitoring and 
 **Authentication:** Required if `ADMIN_PASSWORD` is set.
 
 **Response 200:** HTML page (see [Admin Dashboard](#admin-dashboard) section)
+
+---
+
+### `GET /admin/audit`
+
+Structured audit log viewer with filtering, pagination, and summary statistics.
+
+**Authentication:** Required if `ADMIN_PASSWORD` is set.
+
+**Response 200:** Self-contained HTML page with:
+- Stats cards (total events, unique sessions, last 24h, warnings, errors)
+- Category filter, severity filter, search input
+- Paginated audit log table with severity color badges
+- Clickable session token to filter by session
+- Total count display
 
 ---
 
@@ -576,6 +892,206 @@ Returns recent event log entries.
 
 ---
 
+### `GET /api/audit/logs`
+
+Returns filtered, paginated audit log entries.
+
+**Authentication:** Required if `ADMIN_PASSWORD` is set.
+
+**Query parameters:**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `token` | string | — | Filter by session token |
+| `category` | string | — | Filter by category: connection, mouse, touchpad, airmouse, presentation, media, system, gesture, admin, security, general |
+| `severity` | string | — | Filter by severity: info, warning, error |
+| `search` | string | — | Full-text search in event and detail fields |
+| `since` | number | — | Unix timestamp — only entries >= this time |
+| `until` | number | — | Unix timestamp — only entries <= this time |
+| `limit` | number | 50 | Max entries per page |
+| `offset` | number | 0 | Pagination offset |
+
+**Response 200:**
+
+```json
+{
+  "rows": [
+    {
+      "id": 1,
+      "token": "a1b2...",
+      "category": "mouse",
+      "event": "mouse:move",
+      "detail": "{\"x\":500,\"y\":300}",
+      "ip": "192.168.1.100",
+      "device_name": "Pixel 7",
+      "severity": "info",
+      "ts": 1743123400.0
+    }
+  ],
+  "total": 1523
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `rows` | array | Array of audit log entry objects |
+| `total` | number | Total matching entries (for pagination) |
+
+**Audit log entry fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | number | Auto-incrementing ID |
+| `token` | string | Session token |
+| `category` | string | Event category |
+| `event` | string | Socket.IO event name |
+| `detail` | string | JSON string with event payload |
+| `ip` | string | Client IP address |
+| `device_name` | string | Client device name |
+| `severity` | string | info, warning, or error |
+| `ts` | number | Unix timestamp |
+
+---
+
+### `GET /api/audit/stats`
+
+Returns summary statistics from the audit logs table.
+
+**Authentication:** Required if `ADMIN_PASSWORD` is set.
+
+**Response 200:**
+
+```json
+{
+  "total": 15230,
+  "unique_sessions": 12,
+  "last_24h": 892,
+  "by_category": {
+    "connection": 450,
+    "mouse": 8200,
+    "touchpad": 3100,
+    "airmouse": 2800,
+    "system": 500,
+    "admin": 180
+  },
+  "by_severity": {
+    "info": 14800,
+    "warning": 380,
+    "error": 50
+  }
+}
+```
+
+---
+
+### `GET /api/audit/categories`
+
+Returns distinct category values from the audit logs table.
+
+**Authentication:** Required if `ADMIN_PASSWORD` is set.
+
+**Response 200:**
+
+```json
+[
+  "connection",
+  "mouse",
+  "touchpad",
+  "airmouse",
+  "presentation",
+  "media",
+  "system",
+  "gesture",
+  "admin",
+  "security",
+  "general"
+]
+```
+
+---
+
+### `GET /setup`
+
+The TouchMorph setup page. Returns an HTML page with email configuration form, log viewer, and dependency status check.
+
+**Authentication:** None
+
+**Response 200:** HTML page with:
+- Email SMTP configuration form (Save & Test / Test Only buttons)
+- Live log viewer (last 50 events)
+- Dependency status check (pyautogui, socket.io client build)
+
+---
+
+### `POST /api/setup/email`
+
+Save email configuration without sending a test.
+
+**Authentication:** None
+
+**Request body:**
+
+```json
+{
+  "smtp_host": "smtp.gmail.com",
+  "smtp_port": 587,
+  "smtp_user": "user@gmail.com",
+  "smtp_pass": "app-password",
+  "smtp_from": "user@gmail.com",
+  "smtp_to": "phone@example.com"
+}
+```
+
+**Response 200:**
+
+```json
+{ "ok": true }
+```
+
+---
+
+### `POST /api/setup/test-email`
+
+Save email configuration and send a test email.
+
+**Authentication:** None
+
+**Request body:** Same as `/api/setup/email`.
+
+**Response 200:**
+
+```json
+{ "ok": true, "message": "Test email sent successfully" }
+```
+
+On failure:
+
+```json
+{ "ok": false, "error": "Connection refused" }
+```
+
+---
+
+### `GET /api/setup/status`
+
+Returns dependency and configuration status.
+
+**Authentication:** None
+
+**Response 200:**
+
+```json
+{
+  "pyautogui": true,
+  "client_built": true,
+  "email_configured": false,
+  "admin_password_set": true,
+  "version": "1.0.0"
+}
+```
+
+---
+
 ### `GET /` (Root)
 
 Serves the TouchMorph client application.
@@ -600,6 +1116,9 @@ The server logs all significant events to the SQLite `logs` table. These are the
 | `kicked` | Device was kicked from admin dashboard |
 | `mode:mouse` | Mode switched to mouse |
 | `mode:touchpad` | Mode switched to touchpad |
+| `mode:airmouse` | Mode switched to air mouse |
+| `mode:presentation` | Mode switched to presentation |
+| `mode:media` | Mode switched to media controller |
 | `click:left` | Left click performed |
 | `click:right` | Right click performed |
 | `double_click` | Double-click performed |
@@ -608,9 +1127,27 @@ The server logs all significant events to the SQLite `logs` table. These are the
 | `mouse:click` | Mouse mode click |
 | `mouse:doubleclick` | Mouse mode double-click |
 | `mouse:scroll` | Mouse mode scroll |
+| `mouse:hold` | Mouse hold (drag start) |
+| `mouse:release` | Mouse release (drag end) |
+| `mouse:drag` | Mouse drag move |
 | `touchpad:move` | Touchpad 1-finger move |
 | `touchpad:tap` | Touchpad tap (click) |
 | `touchpad:two_finger_scroll` | Touchpad 2-finger scroll |
+| `airmouse:move` | Air mouse gyro movement |
+| `gesture:start` | Multi-touch gesture start |
+| `gesture:move` | Multi-touch gesture move |
+| `gesture:end` | Multi-touch gesture end |
+| `gesture:n_finger_swipe` | Detected n-finger swipe |
+| `gesture:pinch` | Detected pinch gesture |
+| `presentation:action` | Presentation control action |
+| `media:action` | Media playback control |
+| `system:action` | System keyboard shortcut |
+| `smartscroll:start` | Smart scroll gesture start |
+| `smartscroll:move` | Smart scroll gesture move |
+| `smartscroll:end` | Smart scroll gesture end |
+| `smartscroll:config` | Smart scroll configuration set |
+| `screen:info` | Screen dimensions requested |
+| `server:shutdown` | Server shutting down (broadcast) |
 
 ---
 
@@ -745,6 +1282,7 @@ mindmap
       session:restore
       session:created
       session:restored
+      server:shutdown
     Pairing
       pair:request
       pair:code
@@ -754,11 +1292,13 @@ mindmap
     Mode
       mode:switch
       mode:switched
+      screen:info
     Mouse Control
       mouse:event[type=move]
       mouse:event[type=click]
       mouse:event[type=doubleclick]
       mouse:event[type=scroll]
+      mouse:event[type=hold/drag/release]
       click:left
       click:right
       click:double
@@ -767,6 +1307,24 @@ mindmap
       touchpad:event[type=move]
       touchpad:event[type=tap]
       touchpad:event[type=two_finger_scroll]
+    Air Mouse
+      airmouse:move
+    Gestures
+      gesture:start
+      gesture:move
+      gesture:end
+      gesture:n_finger_swipe
+    Presentation
+      presentation:action
+    Media
+      media:action
+    System
+      system:action
+    Smart Scroll
+      smartscroll:start
+      smartscroll:move
+      smartscroll:end
+      smartscroll:config
     Heartbeat
       ping
 ```
@@ -777,16 +1335,31 @@ mindmap
 |-----------|-------|---------|----------|-------|
 | C→S | `session:restore` | `{ token? }` | `session:created` or `session:restored` | Sent on every connect |
 | S→C | `session:created` | `{ token }` | — | New session |
-| S→C | `session:restored` | `{ token, paired, mode }` | — | Existing session |
+| S→C | `session:restored` | `{ token, paired, mode, screenW, screenH }` | — | Existing session |
 | C→S | `pair:request` | — | `pair:code` | Generates new code |
 | S→C | `pair:code` | `{ code }` | — | 6-digit code |
 | C→S | `pair:verify` | `{ code }` | `pair:success` or `pair:error` | Validates code |
 | S→C | `pair:success` | `{ message }` | — | Pairing OK |
 | S→C | `pair:error` | `{ message }` | — | Wrong code |
-| C→S | `mode:switch` | `{ mode }` | `mode:switched` | mouse/touchpad |
-| S→C | `mode:switched` | `{ mode }` | — | Confirms switch |
-| C→S | `mouse:event` | `{ type, x?, y?, ... }` | — | Various mouse actions |
-| C→S | `touchpad:event` | `{ type, deltaX?, deltaY? }` | — | Touchpad actions |
+| C→S | `mode:switch` | `{ mode }` | `mode:switched` | mouse/touchpad/airmouse/presentation/media |
+| S→C | `mode:switched` | `{ mode, screenWidth, screenHeight }` | — | Confirms switch + screen dims |
+| C→S | `screen:info` | — | `screen:info` | Request screen dimensions |
+| S→C | `screen:info` | `{ screenWidth, screenHeight }` | — | Screen dimensions response |
+| S→C | `server:shutdown` | `{ message }` | — | Server stopping (broadcast) |
+| C→S | `mouse:event` | `{ type, x?, y?, ... }` | — | Mouse move/click/drag/hold/release |
+| C→S | `touchpad:event` | `{ type, deltaX?, deltaY? }` | — | Touchpad relative move/tap |
+| C→S | `airmouse:move` | `{ alpha?, beta, gamma }` | — | Gyroscope movement |
+| C→S | `gesture:start` | `{ touches }` | — | Multi-touch start |
+| C→S | `gesture:move` | `{ touches }` | — | Multi-touch move |
+| C→S | `gesture:end` | `{ touches }` | — | Multi-touch end |
+| C→S | `gesture:n_finger_swipe` | `{ direction, fingerCount }` | — | Detected swipe gesture |
+| C→S | `presentation:action` | `{ action }` | — | Slide control (next/prev/start/exit/black/white/first/pointer) |
+| C→S | `media:action` | `{ action }` | — | Media keys (play_pause/next/prev/vol_up/vol_down/mute) |
+| C→S | `system:action` | `{ action }` | — | System shortcuts (alt_tab/copy/paste/etc.) |
+| C→S | `smartscroll:start` | `{ touchId, x, y }` | — | Smart scroll start |
+| C→S | `smartscroll:move` | `{ touchId, x, y }` | — | Smart scroll move |
+| C→S | `smartscroll:end` | `{ touchId }` | — | Smart scroll end |
+| C→S | `smartscroll:config` | `{ sensitivity?, naturalScroll?, decay? }` | — | Config scroll params |
 | C→S | `click:left` | — | — | Left mouse click |
 | C→S | `click:right` | — | — | Right mouse click |
 | C→S | `click:double` | — | — | Double click |
@@ -805,9 +1378,17 @@ mindmap
 | GET | `/admin/login` | No | text/html | Login form HTML |
 | POST | `/admin/login` | No | form-urlencoded | 302 or login form |
 | GET | `/admin/logout` | If ADMIN_PASSWORD set | — | 302 to /admin/login |
+| GET | `/admin/audit` | If ADMIN_PASSWORD set | text/html | Audit log viewer HTML |
 | GET | `/api/devices` | If ADMIN_PASSWORD set | application/json | Device list JSON |
 | POST | `/api/kick` | If ADMIN_PASSWORD set | application/json | `{"ok":true}` |
 | GET | `/api/logs` | If ADMIN_PASSWORD set | application/json | Log entries JSON |
+| GET | `/api/audit/logs` | If ADMIN_PASSWORD set | application/json | Filtered audit entries |
+| GET | `/api/audit/stats` | If ADMIN_PASSWORD set | application/json | Audit summary stats |
+| GET | `/api/audit/categories` | If ADMIN_PASSWORD set | application/json | Available categories |
+| GET | `/setup` | No | text/html | Setup/email config page |
+| POST | `/api/setup/email` | No | application/json | Email config result |
+| POST | `/api/setup/test-email` | No | application/json | Test email result |
+| GET | `/api/setup/status` | No | application/json | Dependency status |
 | GET | `/assets/*` | No | varies | Static client assets |
 
 ---
@@ -826,7 +1407,9 @@ mindmap
 
 ```json
 {
-  "token": "string — new UUID v4 session token, e.g., 'a1b2c3d4-e5f6-7890-abcd-ef1234567890'"
+  "token": "string — new UUID v4 session token, e.g., 'a1b2c3d4-e5f6-7890-abcd-ef1234567890'",
+  "screenWidth": "number — total screen width in pixels",
+  "screenHeight": "number — total screen height in pixels"
 }
 ```
 
@@ -836,7 +1419,9 @@ mindmap
 {
   "token": "string — session token (may differ from requested if server rotated it)",
   "paired": "boolean — whether device was previously paired",
-  "mode": "string — 'mouse' or 'touchpad'"
+  "mode": "string — 'mouse', 'touchpad', 'airmouse', 'presentation', or 'media'",
+  "screenWidth": "number — total screen width in pixels",
+  "screenHeight": "number — total screen height in pixels"
 }
 ```
 
@@ -880,7 +1465,7 @@ No payload. The server generates a new 6-digit code and invalidates any previous
 
 ```json
 {
-  "mode": "string (required) — 'mouse' or 'touchpad'"
+  "mode": "string (required) — 'mouse', 'touchpad', 'airmouse', 'presentation', or 'media'"
 }
 ```
 
@@ -888,7 +1473,9 @@ No payload. The server generates a new 6-digit code and invalidates any previous
 
 ```json
 {
-  "mode": "string — 'mouse' or 'touchpad'"
+  "mode": "string — confirmed mode",
+  "screenWidth": "number — total screen width in pixels",
+  "screenHeight": "number — total screen height in pixels"
 }
 ```
 
@@ -969,6 +1556,123 @@ No payload.
 {
   "deltaX": "number (optional) — horizontal scroll delta, default 0",
   "deltaY": "number (optional) — vertical scroll delta, default 0"
+}
+```
+
+### mouse:event — Hold / Release / Drag
+
+```json
+{
+  "type": "'hold'",
+  "button": "'left' (optional)"
+}
+```
+
+```json
+{
+  "type": "'release'"
+}
+```
+
+```json
+{
+  "type": "'drag'",
+  "x": "number — absolute X coordinate (0 to screen width)",
+  "y": "number — absolute Y coordinate (0 to screen height)"
+}
+```
+
+### airmouse:move
+
+```json
+{
+  "alpha": "number (optional) — compass heading in degrees",
+  "beta": "number — front-back tilt in degrees",
+  "gamma": "number — left-right tilt in degrees"
+}
+```
+
+### gesture:start / gesture:move / gesture:end
+
+```json
+{
+  "touches": [
+    { "id": "number — unique touch identifier", "x": "number — X coordinate", "y": "number — Y coordinate" }
+  ]
+}
+```
+
+### gesture:n_finger_swipe
+
+```json
+{
+  "direction": "string — 'up', 'down', 'left', or 'right'",
+  "fingerCount": "number — 2, 3, or 4+"
+}
+```
+
+### presentation:action
+
+```json
+{
+  "action": "string — 'next', 'prev', 'black', 'white', 'start', 'escape', 'first', or 'pointer'"
+}
+```
+
+### media:action
+
+```json
+{
+  "action": "string — 'play_pause', 'next', 'prev', 'vol_up', 'vol_down', or 'mute'"
+}
+```
+
+### system:action
+
+```json
+{
+  "action": "string — 'alt_tab', 'task_view', 'show_desktop', 'lock_screen', 'copy', 'paste', 'cut', 'undo', 'redo', 'select_all', 'save', 'find', 'esc', 'enter', or 'fullscreen'"
+}
+```
+
+### smartscroll:start / smartscroll:move / smartscroll:end
+
+```json
+{
+  "touchId": "number — unique touch identifier",
+  "x": "number (start/move only) — X coordinate",
+  "y": "number (start/move only) — Y coordinate"
+}
+```
+
+### smartscroll:config
+
+```json
+{
+  "sensitivity": "number (optional) — scroll sensitivity multiplier, default 1.0",
+  "naturalScroll": "boolean (optional) — reverse scroll direction, default false",
+  "decay": "number (optional) — momentum decay rate 0.0-1.0, default 0.92"
+}
+```
+
+### screen:info (Request)
+
+No payload.
+
+### screen:info (Response)
+
+```json
+{
+  "screenWidth": "number — total screen width in pixels",
+  "screenHeight": "number — total screen height in pixels"
+}
+```
+
+### server:shutdown (Response)
+
+```json
+{
+  "message": "string — 'Server is shutting down'"
 }
 ```
 
@@ -1081,6 +1785,21 @@ curl -X POST http://localhost:3000/api/kick \
 
 # Event logs
 curl http://localhost:3000/api/logs -b cookies.txt
+
+# Audit logs (filtered + paginated)
+curl "http://localhost:3000/api/audit/logs?category=mouse&severity=warning&limit=10" -b cookies.txt
+
+# Audit stats summary
+curl http://localhost:3000/api/audit/stats -b cookies.txt
+
+# Audit categories
+curl http://localhost:3000/api/audit/categories -b cookies.txt
+
+# Admin audit dashboard
+curl http://localhost:3000/admin/audit -b cookies.txt
+
+# Setup / email config page
+curl http://localhost:3000/setup
 
 # Test email config (no auth needed)
 python server/email_service.py --test

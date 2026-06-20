@@ -562,31 +562,35 @@ def _init():
 
 ### Database Size Growth
 
-The `logs` table grows unboundedly. For long-running servers:
+The `logs` table and `audit_logs` table grow over time. The server automatically handles cleanup:
+
+- **Stale sessions** — deleted after 24 hours of inactivity (runs every 60 minutes).
+- **Event logs** — trimmed to the last 1,000 rows.
+- **Audit logs** — trimmed to the last 10,000 rows.
+
+Manual cleanup commands:
 
 ```bash
-# Manual cleanup — archive logs older than 30 days
+# Archive event logs older than 30 days
 sqlite3 server/touchmorph.db "
   DELETE FROM logs WHERE ts < strftime('%s', 'now', '-30 days');
   VACUUM;
 "
-```
 
-Or add an auto-cleanup in `log_event()`:
+# Archive audit logs older than 30 days
+sqlite3 server/touchmorph.db "
+  DELETE FROM audit_logs WHERE ts < strftime('%s', 'now', '-30 days');
+  VACUUM;
+"
 
-```python
-def log_event(token, event):
-    conn = sqlite3.connect(str(DB_PATH))
-    conn.execute("INSERT INTO logs (token, event, ts) VALUES (?, ?, ?)",
-                 (token, event, time.time()))
-    # Auto-cleanup: keep last 10000 entries
-    conn.execute("""
-        DELETE FROM logs WHERE id NOT IN (
-            SELECT id FROM logs ORDER BY id DESC LIMIT 10000
-        )
-    """)
-    conn.commit()
-    conn.close()
+# Check current row counts
+sqlite3 server/touchmorph.db "
+  SELECT 'logs' AS table_name, COUNT(*) FROM logs
+  UNION ALL
+  SELECT 'audit_logs', COUNT(*) FROM audit_logs
+  UNION ALL
+  SELECT 'sessions', COUNT(*) FROM sessions;
+"
 ```
 
 ---
@@ -731,6 +735,8 @@ sqlite3 server/touchmorph.db "PRAGMA integrity_check;"
 sqlite3 server/touchmorph.db ".tables"
 sqlite3 server/touchmorph.db "SELECT count(*) FROM sessions;"
 sqlite3 server/touchmorph.db "SELECT count(*) FROM logs;"
+sqlite3 server/touchmorph.db "SELECT count(*) FROM audit_logs;"
+sqlite3 server/touchmorph.db "SELECT category, severity, COUNT(*) FROM audit_logs GROUP BY category, severity;"
 
 # Check Python package versions
 pip list | findstr -i "socketio aiohttp pyautogui dotenv"

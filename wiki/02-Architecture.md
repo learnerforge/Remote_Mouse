@@ -186,7 +186,7 @@ The server runs as a **single-threaded async event loop** using Python's `asynci
 |------|---------------|----------------------|
 | `main.py` | Entry point, route registration, admin auth, middleware | `admin_login()`, `admin_dashboard()`, `auth_middleware()`, `_check_admin()` |
 | `socket_handler.py` | All WebSocket event handlers | `TouchMorphSocket` class with 15+ event handlers |
-| `session_store.py` | SQLite CRUD for sessions and logs | `create_session()`, `restore_session()`, `update_session()`, `list_sessions()`, `delete_session()`, `log_event()`, `get_logs()` |
+| `session_store.py` | SQLite CRUD for sessions, logs, and audit_logs | `create_session()`, `restore_session()`, `update_session()`, `list_sessions()`, `delete_session()`, `log_event()`, `get_logs()`, `audit_log()`, `query_audit_logs()`, `get_audit_stats()`, `cleanup_stale_sessions()`, `trim_logs()` |
 | `mouse_controller.py` | pyautogui abstraction layer | `MouseController` class with `move()`, `click()`, `double_click()`, `scroll()`, `position()` |
 | `gesture_processor.py` | Touch gesture recognition | `GestureProcessor` class with `detect_swipe()`, `detect_tap()` |
 | `email_service.py` | SMTP email for tunnel URL | `send_tunnel_url()`, `test_config()` |
@@ -375,7 +375,19 @@ erDiagram
         string event "Event name"
         real ts "Unix timestamp"
     }
+    AUDIT_LOGS {
+        int id PK "Auto-increment"
+        string token "Session token"
+        string category "connection/mouse/touchpad/..."
+        string event "Event name"
+        string detail "JSON string"
+        string ip "Client IP"
+        string device_name "Device name"
+        string severity "info/warning/error"
+        real ts "Unix timestamp"
+    }
     SESSIONS ||--o{ LOGS : "has_many"
+    SESSIONS ||--o{ AUDIT_LOGS : "has_many"
 ```
 
 ### Sessions Table
@@ -401,6 +413,26 @@ CREATE TABLE logs (
     event   TEXT NOT NULL,               -- "connect" | "disconnect" | "paired" | "click:left" | ...
     ts      REAL NOT NULL                -- 1743123456.789
 );
+
+### Audit Logs Table
+
+```sql
+CREATE TABLE audit_logs (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    token       TEXT NOT NULL,
+    category    TEXT NOT NULL,           -- connection | mouse | touchpad | airmouse | presentation | media | system | gesture | admin | security | general
+    event       TEXT NOT NULL,           -- Socket.IO event name
+    detail      TEXT DEFAULT '{}',       -- JSON string with event-specific data
+    ip          TEXT DEFAULT '',
+    device_name TEXT DEFAULT '',
+    severity    TEXT DEFAULT 'info',     -- info | warning | error
+    ts          REAL NOT NULL            -- 1743123456.789
+);
+CREATE INDEX idx_audit_token ON audit_logs(token);
+CREATE INDEX idx_audit_category ON audit_logs(category);
+CREATE INDEX idx_audit_severity ON audit_logs(severity);
+CREATE INDEX idx_audit_ts ON audit_logs(ts);
+```
 ```
 
 ---
@@ -970,6 +1002,9 @@ flowchart TB
 | **Application** | Session tokens + pairing codes | Two-factor-like authentication |
 | **Admin** | Password + HMAC-signed cookies | Optional but recommended |
 | **Code** | Input validation | All WebSocket payloads are parsed defensively |
+| **Code** | Rate limiting | 60 events/sec token bucket per session |
+| **Code** | Structured audit logging | All events logged with category, severity, IP to `audit_logs` table |
+| **Code** | Auto-cleanup | Stale sessions purged after 24h, logs trimmed to 1K, audit logs to 10K |
 | **Database** | SQLite permissions | File permissions restrict access (default: owner only) |
 
 ### Attack Scenarios
@@ -980,4 +1015,4 @@ flowchart TB
 | Brute-force pairing code | Medium (1M tries) | Unauthorized control | Code invalidates after use |
 | Steal session cookie from admin | Medium (XSS) | Admin access | HttpOnly + SameSite=Strict |
 | Replay mouse events | Easy | Unauthorized cursor movement | Session token bound to WebSocket session |
-| Crash server (DOS) | Easy (many connections) | Service unavailable | No rate limiting implemented |
+| Crash server (DOS) | Easy (many connections) | Service unavailable | 60 events/sec rate limiting per session + auto-cleanup |

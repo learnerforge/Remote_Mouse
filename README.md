@@ -16,10 +16,16 @@ graph LR
 ## Features
 
 - **No installation on phone** — works in any modern browser (Chrome, Safari, Firefox)
-- **Dual modes** — mouse mode (precision pointer + click buttons) and touchpad mode (1-finger move, 2-finger scroll, tap-to-click)
+- **5 input modes** — Mouse, Touchpad, Air Mouse, Presentation, Media Controller
+- **Gesture recognition** — pinch-to-zoom, 2F/3F/4F swipes, long-press drag, shake detection
+- **Smart Scroll** — momentum-based scrolling with configurable sensitivity and natural scroll
 - **Session persistence** — stays paired across page refreshes, background tabs, and network interruptions
 - **Secure pairing** — 6-digit code system ensures only authorized devices connect
 - **Admin dashboard** — web-based dashboard at `/admin` to monitor connected devices, view event logs, and kick unauthorized devices
+- **Audit logging** — structured audit trail with categories, severity levels, IP tracking, and filterable query API
+- **Rate limiting + input validation** — 60 events/sec cap, payload type/bounds checking, invalid action rejection
+- **Auto-cleanup** — stale sessions purged after 24h, logs trimmed to 1000 rows
+- **Graceful shutdown** — notifies connected clients before server stops
 - **Admin authentication** — optional password protection for the dashboard
 - **HTTPS tunnel** — integrated Cloudflare Tunnel support with email delivery of the tunnel URL
 - **Cross-platform** — Python backend runs on Windows, Linux, and macOS
@@ -103,32 +109,48 @@ Open that URL in your phone's browser. Tap **Generate Code**, then enter the cod
 
 ```
 Remote_Mouse/
-├── client/                     # React + Vite + TypeScript frontend
-│   ├── dist/                   # Production build (generated)
+├── client/                         # React + Vite + TypeScript frontend
+│   ├── dist/                       # Production build (generated)
 │   ├── src/
-│   │   ├── components/         # Reusable UI components
-│   │   ├── hooks/              # Custom React hooks
-│   │   └── pages/              # Route/page components
+│   │   ├── components/             # Reusable UI components
+│   │   │   ├── BottomNav.tsx       # 6-tab navigation bar
+│   │   │   └── ...
+│   │   ├── hooks/
+│   │   │   └── useSocket.ts        # Socket.IO + screen dimensions
+│   │   └── pages/
+│   │       ├── MouseMode.tsx        # Pointer + clicks + drag
+│   │       ├── TouchpadMode.tsx     # Relative move + smart scroll
+│   │       ├── AirMouseMode.tsx     # Gyro-based pointer
+│   │       ├── PresentationMode.tsx # Slide control + laser pointer
+│   │       ├── MediaController.tsx  # Play/pause/vol keys
+│   │       └── Settings.tsx         # Sensitivity, gesture ref, about
 │   ├── index.html
 │   ├── package.json
 │   ├── vite.config.ts
 │   ├── tailwind.config.js
 │   └── tsconfig.json
-├── server/                     # Python aiohttp + Socket.IO backend
-│   ├── main.py                 # Entry point, routes, admin auth
-│   ├── socket_handler.py       # WebSocket event handlers
-│   ├── session_store.py        # SQLite persistence layer
-│   ├── mouse_controller.py     # pyautogui wrapper
-│   ├── gesture_processor.py    # Swipe/tap gesture detection
-│   ├── email_service.py        # SMTP email sender
-│   ├── config.py               # Environment configuration
-│   ├── requirements.txt        # Python dependencies
-│   └── touchmorph.db           # SQLite database (auto-created)
+├── server/                         # Python aiohttp + Socket.IO backend
+│   ├── main.py                     # Entry point, routes, admin auth, cleanup task
+│   ├── socket_handler.py           # WebSocket event handlers (35+ events)
+│   ├── session_store.py            # SQLite persistence + audit logging
+│   ├── mouse_controller.py         # pyautogui wrapper (mouse, media, system)
+│   ├── gesture_processor.py        # Multi-touch gesture engine
+│   ├── email_service.py            # SMTP email sender
+│   ├── config.py                   # Environment configuration
+│   ├── requirements.txt            # Python dependencies
+│   └── touchmorph.db               # SQLite database (auto-created)
 ├── scripts/
-│   ├── start-tunnel.ps1        # Cloudflare Tunnel (Windows)
-│   └── start.sh                # Cloudflare Tunnel (Linux)
-├── start.py                    # One-command launcher
-├── .env.example                # Environment configuration template
+│   ├── start-tunnel.ps1            # Cloudflare Tunnel (Windows)
+│   └── start.sh                    # Cloudflare Tunnel (Linux)
+├── wiki/
+│   ├── 01-Getting-Started.md
+│   ├── 02-Architecture.md
+│   ├── 03-API-Reference.md
+│   ├── 04-Deployment.md
+│   ├── 05-Development.md
+│   └── 06-Troubleshooting.md
+├── start.py                        # One-command launcher
+├── .env.example                    # Environment configuration template
 ├── README.md
 └── LICENSE
 ```
@@ -294,10 +316,23 @@ The WebSocket protocol and server architecture are designed to be extensible. Ke
 
 - **Server:** Python aiohttp + python-socketio backend with SQLite persistence
 - **Client:** React 18 + TypeScript + Vite + TailwindCSS
-- **Mouse mode:** Absolute cursor movement with left/right/double-click buttons
-- **Touchpad mode:** 1-finger move, 2-finger scroll, tap-to-click
-- **Pairing:** 6-digit code system with session persistence
+- **5 input modes:** Mouse (absolute), Touchpad (relative + smart scroll), Air Mouse (gyro), Presentation, Media Controller
+- **Gesture engine:** Multi-touch tracking, pinch detection, 2F/3F/4F swipes, long-press drag, shake detection
+- **Mouse mode:** Absolute cursor movement with left/right/double-click buttons, hold/drag support
+- **Touchpad mode:** 1-finger move, 2-finger scroll, tap-to-click, edge scrolling
+- **Smart Scroll:** Momentum-based scrolling with configurable sensitivity, natural scroll toggle, decay tuning
+- **Air Mouse:** Gyroscope-based pointer with auto-calibration, dead zone, absolute/relative modes
+- **Presentation mode:** Slide navigation, start/exit/black/white, laser pointer hold
+- **Media Controller:** Play/pause, next/prev, volume up/down/mute
+- **System shortcuts:** Alt+Tab, task view, show desktop, lock, copy/paste/cut/undo/redo/select all/save/find/esc/enter
+- **Session persistence:** UUID v4 tokens in localStorage, survives tab eviction
+- **Secure pairing:** 6-digit one-time code, 1M combinations
 - **Admin dashboard:** Real-time device monitoring, event logs, device kick
+- **Audit logging:** Structured audit_logs table with category, severity, IP, detail (JSON), paginated API
+- **Input validation:** Payload type checking, button/direction whitelists, bounds clamping
+- **Rate limiting:** 60 events/sec per session with warning logging
+- **Auto-cleanup:** Stale sessions purged after 24h, logs trimmed to 1000 rows
+- **Graceful shutdown:** Notifies connected clients before exit
 - **Admin auth:** Optional HMAC-signed cookie authentication
 - **Port fallback:** Auto-detects available port (3000 → 3009)
 - **Cloudflare Tunnel:** PowerShell and bash scripts with email delivery
@@ -311,7 +346,6 @@ The WebSocket protocol and server architecture are designed to be extensible. Ke
 - QR code generation for zero-typing discovery
 - mDNS/Bonjour discovery for automatic LAN detection
 - Multi-monitor coordinate mapping
-- Sensitivity and acceleration settings
 - Keyboard input support
 - Dark/light theme toggle
 - Device naming in admin dashboard

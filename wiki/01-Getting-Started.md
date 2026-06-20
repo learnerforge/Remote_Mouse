@@ -308,6 +308,7 @@ The mouse mode provides a virtual touch area and three click buttons:
 - **Left Click** — Tap the Left button.
 - **Right Click** — Tap the Right button (opens context menus).
 - **Double Click** — Tap the Double button (opens files/applications).
+- **Long-Press Drag** — Hold finger still for 600ms to enter drag mode, then move to drag.
 
 ### Touchpad Mode
 
@@ -316,6 +317,41 @@ The touchpad mode gives a more laptop-like experience:
 - **1 Finger Move** — Drag with one finger to move the cursor (relative movement, like a laptop touchpad).
 - **2 Finger Scroll** — Use two fingers to scroll vertically/horizontally.
 - **Tap to Click** — Tap anywhere on the touchpad area to left-click.
+- **2F Tap** — Two-finger tap = right-click.
+- **3F Tap** — Three-finger tap = middle-click.
+- **Smart Scroll** — Momentum-based scrolling with configurable sensitivity, natural scroll toggle, and decay tuning (via Settings).
+- **Edge Scrolling** — When cursor reaches screen edge, touchpad continues scrolling.
+
+### Air Mouse Mode
+
+Control the cursor by tilting your phone:
+
+- **Tilt to Move** — Rotate phone to move cursor (uses gyroscope).
+- **Auto-Calibration** — Stabilizes gyro data 500ms after entering mode.
+- **Absolute Mode** — Maps phone tilt directly to screen position.
+- **Relative Mode** — Tilt delta moves cursor incrementally (default).
+- **Recalibrate** — Tap button to reset gyro baseline.
+- **Dead Zone** — 2° threshold prevents drift.
+
+### Presentation Mode
+
+Navigate slide decks from your phone:
+
+- **Next/Prev** — Advance or go back one slide.
+- **Black/White** — Blank screen with black or white.
+- **Start** — Begin slideshow from first slide (F5).
+- **Escape** — Exit slideshow.
+- **First** — Jump to first slide.
+- **Laser Pointer** — Hold to activate pointer mode.
+
+### Media Controller
+
+Control media playback:
+
+- **Play/Pause** — Toggle playback.
+- **Next/Prev** — Skip track.
+- **Vol +/-** — Adjust volume.
+- **Mute** — Toggle mute.
 
 ```mermaid
 flowchart TD
@@ -347,7 +383,8 @@ The dashboard shows:
 
 - **Connected Devices** — List of all devices with their session tokens, IP addresses, pairing status, current mode, and last active time.
 - **Kick Button** — Force-disconnect a device.
-- **Event Log** — Real-time log of all WebSocket events.
+- **Event Log** — Real-time log of all WebSocket events (legacy).
+- **Audit Log Viewer** — Dedicated audit page at `/admin/audit` with structured logs: filterable by category (connection, mouse, airmouse, gesture, admin, security, etc.), severity (info/warning/error), session token, and time range; includes pagination and summary statistics.
 - **Auto-Refresh** — The dashboard refreshes every 3 seconds.
 
 If `ADMIN_PASSWORD` is set in `.env`, you must log in first:
@@ -727,6 +764,7 @@ The admin dashboard provides a web-based interface for monitoring connected devi
 | **Status badges** | Green = Paired, Yellow = Pending (not yet paired) |
 | **Kick button** | Force-disconnects a device — it must re-pair on next connect |
 | **Event log** | Shows last 50 events with timestamps and truncated tokens |
+| **Audit logs** | Visit `/admin/audit` for structured audit trail with category/severity filters, pagination, search, and stats |
 
 ### Admin Session Lifecycle
 

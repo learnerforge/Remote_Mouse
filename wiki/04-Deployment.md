@@ -652,6 +652,10 @@ journalctl -u touchmorph.service -f
 
 # Database logs (via admin dashboard)
 curl http://localhost:3000/api/logs
+
+# Audit logs (structured, filterable)
+curl http://localhost:3000/api/audit/logs?category=mouse&severity=warning&limit=10
+curl http://localhost:3000/api/audit/stats
 ```
 
 ---
