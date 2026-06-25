@@ -75,7 +75,7 @@ export default function TouchpadMode({ emit }: Props) {
   const handlePointerUp = useCallback(() => {
     if (scrollActive.current) {
       if (momentum) emit('smartscroll:end')
-      else scrollActive.current = false
+      scrollActive.current = false
     }
   }, [emit, momentum])
 

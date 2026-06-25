@@ -30,7 +30,7 @@ export default function AirMouseMode({ emit, screenW, screenH }: Props) {
     setShowGuide(false)
     smoothX.current = 0
     smoothY.current = 0
-    navigator.vibrate(20)
+    navigator.vibrate?.(20)
   }, [])
 
   useEffect(() => {

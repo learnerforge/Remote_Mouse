@@ -70,10 +70,17 @@ def send_tunnel_url(tunnel_url: str) -> bool:
     last_error = None
     for attempt in range(1, MAX_RETRIES + 1):
         try:
-            with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=SMTP_TIMEOUT) as server:
-                server.starttls()
-                server.login(SMTP_USER, SMTP_PASS)
-                server.send_message(msg)
+            if SMTP_PORT == 465:
+                with smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT, timeout=SMTP_TIMEOUT) as server:
+                    server.login(SMTP_USER, SMTP_PASS)
+                    server.send_message(msg)
+            else:
+                with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=SMTP_TIMEOUT) as server:
+                    if SMTP_PORT == 587:
+                        server.starttls()
+                    if SMTP_USER:
+                        server.login(SMTP_USER, SMTP_PASS)
+                    server.send_message(msg)
             logger.info(f"Tunnel URL sent to {EMAIL_TO} (attempt {attempt})")
             return True
         except Exception as e:
@@ -94,14 +101,25 @@ def test_config() -> bool:
 
     print(f"Testing SMTP: {SMTP_USER} @ {SMTP_HOST}:{SMTP_PORT} -> {EMAIL_TO}")
     try:
-        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=SMTP_TIMEOUT) as server:
-            server.starttls()
-            server.login(SMTP_USER, SMTP_PASS)
-            msg = MIMEText("TouchMorph SMTP test — successful!")
-            msg["Subject"] = "TouchMorph SMTP Test"
-            msg["From"] = EMAIL_FROM
-            msg["To"] = EMAIL_TO
-            server.send_message(msg)
+        if SMTP_PORT == 465:
+            with smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT, timeout=SMTP_TIMEOUT) as server:
+                server.login(SMTP_USER, SMTP_PASS)
+                msg = MIMEText("TouchMorph SMTP test — successful!")
+                msg["Subject"] = "TouchMorph SMTP Test"
+                msg["From"] = EMAIL_FROM
+                msg["To"] = EMAIL_TO
+                server.send_message(msg)
+        else:
+            with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=SMTP_TIMEOUT) as server:
+                if SMTP_PORT == 587:
+                    server.starttls()
+                if SMTP_USER:
+                    server.login(SMTP_USER, SMTP_PASS)
+                msg = MIMEText("TouchMorph SMTP test — successful!")
+                msg["Subject"] = "TouchMorph SMTP Test"
+                msg["From"] = EMAIL_FROM
+                msg["To"] = EMAIL_TO
+                server.send_message(msg)
         print("OK — test email sent successfully.")
         return True
     except Exception as e:

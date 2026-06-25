@@ -294,9 +294,8 @@ def get_audit_stats() -> dict:
 def cleanup_stale_sessions(max_age_hours=STALE_SESSION_HOURS):
     cutoff = time.time() - max_age_hours * 3600
     conn = _get_conn()
-    deleted = conn.execute(
-        "DELETE FROM sessions WHERE last_active < ?", (cutoff,)
-    ).rowcount
+    conn.execute("DELETE FROM sessions WHERE last_active < ?", (cutoff,))
+    deleted = conn.total_changes
     conn.commit()
     conn.close()
     if deleted:
@@ -333,3 +332,10 @@ def trim_audit_logs(max_rows=MAX_LOG_ROWS * 10):
         conn.commit()
         logger.info(f"Trimmed {delete_count} old audit log row(s)")
     conn.close()
+
+
+def vacuum_db():
+    conn = _get_conn()
+    conn.execute("VACUUM")
+    conn.close()
+    logger.info("Database vacuumed")

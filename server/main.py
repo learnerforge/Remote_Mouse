@@ -13,6 +13,7 @@ from email_service import EmailService
 from session_store import (
     cleanup_stale_sessions,
     trim_logs,
+    vacuum_db,
     get_logs,
     list_sessions,
     query_audit_logs,
@@ -61,6 +62,18 @@ async def mode_switch(sid, data):
 @sio.event
 async def click(sid, button):
     await touchmorph.on_click(sid, button)
+
+@sio.event
+async def click_left(sid):
+    await touchmorph.on_click(sid, "left")
+
+@sio.event
+async def click_right(sid):
+    await touchmorph.on_click(sid, "right")
+
+@sio.event
+async def click_double(sid):
+    await touchmorph.on_double_click(sid)
 
 @sio.event
 async def double_click(sid):
@@ -516,11 +529,17 @@ if client_static.exists():
 # ─── Cleanup task ─────────────────────────────────────────────────────────
 
 async def cleanup_loop():
+    vacuum_counter = 0
     while True:
         await asyncio.sleep(3600)
         try:
-            cleanup_stale_sessions()
-            trim_logs()
+            stale = cleanup_stale_sessions()
+            trimmed = trim_logs()
+            if stale or trimmed:
+                vacuum_counter += 1
+                if vacuum_counter >= 5:
+                    vacuum_db()
+                    vacuum_counter = 0
         except Exception as e:
             logger.exception("Cleanup task error: %s", e)
 
@@ -529,11 +548,16 @@ async def cleanup_loop():
 
 async def shutdown_handler(app):
     logger.info("Shutting down — notifying connected clients...")
-    for sid in list(sio.manager.get_participants("/", None)):
-        try:
-            await sio.emit("server:shutdown", {"message": "Server is shutting down"}, to=sid)
-        except Exception:
-            pass
+    try:
+        async for sid in sio.manager.get_participants("/", None):
+            try:
+                await sio.emit("server:shutdown", {"message": "Server is shutting down"}, to=sid)
+            except Exception:
+                pass
+    except (NotImplementedError, AttributeError):
+        logger.warning("get_participants not available — skipping shutdown broadcast")
+    except Exception as e:
+        logger.warning("Error during shutdown notification: %s", e)
     logger.info("Shutdown complete.")
 
 

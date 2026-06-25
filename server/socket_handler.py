@@ -193,7 +193,12 @@ class TouchMorphSocket:
             audit_log(token or "", "system", "mode_switch",
                       {"from": old_mode, "to": mode},
                       ip=ip, device_name=self._get_device_name(sid))
-            await sio.emit("mode:switched", {"mode": mode}, to=sid)
+            info = self._screen_info()
+            await sio.emit("mode:switched", {
+                "mode": mode,
+                "screenWidth": info["width"],
+                "screenHeight": info["height"],
+            }, to=sid)
         else:
             audit_log(token or "", "security", "invalid_mode",
                       {"attempted": mode, "valid": list(VALID_MODES)},
@@ -581,6 +586,9 @@ class TouchMorphSocket:
     # ─── Helpers ──────────────────────────────────────────────────────────
 
     def _is_active(self, sid) -> bool:
+        session = self.sessions.get(sid)
+        if not session or not session.get("paired"):
+            return False
         token = self.sid_to_token.get(sid)
         if token:
             touch_session(token)
