@@ -1,8 +1,11 @@
+import eventlet
+eventlet.monkey_patch()
+
 import os
 import socket as sock_lib
 from datetime import datetime
 from collections import deque
-from flask import Flask, send_file, request, jsonify
+from flask import Flask, send_file, send_from_directory, request, jsonify
 from flask_socketio import SocketIO, emit
 import pyautogui
 from email_service import send_email, build_url_email
@@ -12,7 +15,7 @@ pyautogui.PAUSE = 0
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.urandom(24).hex()
-socketio = SocketIO(app, cors_allowed_origins="*")
+socketio = SocketIO(app, async_mode='eventlet', cors_allowed_origins="*", ping_interval=5, ping_timeout=3)
 
 TUNNEL_URL_FILE = '.tunnel_url'
 EVENT_LOG_FILE = 'events.log'
@@ -49,7 +52,15 @@ def get_tunnel_url():
 
 @app.route('/')
 def index():
-    return send_file('index.html')
+    resp = send_file('index.html')
+    resp.headers['Cache-Control'] = 'no-cache, must-revalidate'
+    return resp
+
+@app.route('/static/<path:filename>')
+def static_files(filename):
+    resp = send_from_directory('static', filename)
+    resp.headers['Cache-Control'] = 'public, max-age=86400'
+    return resp
 
 @app.route('/api/tunnel-url')
 def api_tunnel_url():
@@ -175,7 +186,8 @@ def run_server():
     log_msg(f"* Local:  http://{ip}:5000")
     if tunnel:
         log_msg(f"* Tunnel: {tunnel}")
-    socketio.run(app, host='0.0.0.0', port=5000, debug=False, allow_unsafe_werkzeug=True)
+    log_msg(f"* WebSocket ready")
+    socketio.run(app, host='0.0.0.0', port=5000, debug=False)
 
 if __name__ == '__main__':
     run_server()

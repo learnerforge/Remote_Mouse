@@ -2,208 +2,176 @@
 
 Turn your phone into a wireless mouse and media remote for your laptop. **Zero installation on the phone** — just open a URL in the browser.
 
-## How It Works
+## Overview
 
-Your laptop runs a small Python server and a Cloudflare tunnel. The phone connects via the tunnel URL and sends touch/click events over a WebSocket. The server translates these into actual mouse movements and keystrokes on the laptop using `pyautogui`.
+Remote Mouse is a client-server application that lets you control your laptop's mouse cursor and media playback from any phone or tablet with a modern browser. The laptop runs a Python server (Flask + Socket.IO) that receives touch events over a WebSocket and translates them into mouse movements, clicks, scrolls, and keyboard shortcuts using `pyautogui`.
+
+The phone gets the connection URL either via email (SMTP configured on the laptop) or by typing it manually. A Cloudflare tunnel (cloudflared) provides secure HTTPS access from anywhere without port forwarding.
+
+## How It Works
 
 ```
 Phone Browser                 Cloudflare Edge              Your Laptop
-     │                             │                            │
-     │  open URL from email        │                            │
-     ├─────────────────────────────┼────────────────────────────┤
-     │                             │                            │
-     │  HTTPS request              │  cloudflared tunnel        │
-     │ ───────────────────────────>│ ──────────────────────────>│
-     │                             │                            │
-     │  index.html served          │                            │
-     │ <───────────────────────────│ <──────────────────────────│
-     │                             │                            │
-     │  WebSocket (touch events)   │                            │
-     │ ───────────────────────────>│ ──────────────────────────>│
-     │                             │              pyautogui     │
-     │                             │              moves mouse   │
+     |                             |                            |
+     |  open URL from email        |                            |
+     +-----------------------------+----------------------------+
+     |                             |                            |
+     |  HTTPS request              |  cloudflared tunnel        |
+     | --------------------------->| -------------------------->|
+     |                             |                            |
+     |  index.html served locally  |                            |
+     | <---------------------------| <--------------------------|
+     |                             |                            |
+     |  WebSocket (touch events)   |                            |
+     | --------------------------->| -------------------------->|
+     |                             |              pyautogui    |
+     |                             |              moves mouse  |
 ```
 
 ## Features
 
 | Feature | What it does |
 |---------|-------------|
-| **Touchpad** | Touch & drag to move cursor. Tap to click. Two-finger scroll. |
-| **Left/Right Click** | Dedicated buttons at the bottom. |
+| **Touchpad** | Touch and drag to move cursor. Tap to click. Two-finger scroll. |
+| **Left/Right Click** | Dedicated buttons at the bottom for precise clicks. |
 | **Drag Mode** | Toggle to hold the left button while dragging (for selections, moving windows). |
-| **Media Controls** | Play/Pause, Next/Prev track, Volume up/down/mute. |
-| **Sensitivity** | Adjustable mouse speed (0.2x – 3.0x). |
+| **Media Controls** | Play/Pause, Next/Previous track, Volume up/down/mute. |
+| **Sensitivity** | Adjustable mouse speed slider (0.2x to 3.0x). |
 | **Tunnel URL delivery** | Auto-emails the tunnel URL to your phone so you just tap to connect. |
-| **Local fallback** | If cloudflared isn't installed, use the local network IP directly. |
+| **Local fallback** | If cloudflared is not installed, use the local network IP directly. |
 | **Zero phone setup** | No app store, no installation, no permissions. Just a browser. |
+| **Auto-reconnect** | WebSocket reconnects automatically with exponential backoff. |
+| **Live action log** | All events printed to terminal with timestamps and colorized output. |
+| **REPL control panel** | `cli.py` provides an interactive terminal with status, log, and server management. |
 
 ## Project Structure
 
 ```
 remote-mouse/
-├── server.py              # Flask server + Socket.IO + pyautogui
-├── email_service.py       # SMTP email sender for tunnel URL
-├── index.html             # Single-page frontend (all JS/CSS embedded)
-├── requirements.txt       # Python dependencies
-├── .env.example           # SMTP configuration template
-├── .env                   # Your SMTP settings (create from .env.example)
-├── .gitignore
-├── LICENSE
-├── README.md
-└── scripts/
-    ├── start.ps1          # Windows launcher
-    └── start.sh           # Linux/macOS launcher
++-- server.py              # Flask server + Socket.IO + pyautogui
++-- email_service.py       # SMTP email sender for tunnel URL
++-- cli.py                 # REPL control panel (launches server as subprocess)
++-- index.html             # Single-page frontend (all CSS/JS embedded)
++-- requirements.txt       # Python dependencies
++-- .env.example           # SMTP configuration template
++-- .env                   # Your SMTP settings (create from .env.example)
++-- .gitignore
++-- LICENSE
++-- README.md
++-- static/
+|   +-- socket.io.min.js   # Local Socket.IO client (no CDN dependency)
++-- scripts/
+|   +-- start.ps1          # Windows launcher (Powershell)
+|   +-- start.sh           # Linux/macOS launcher (Bash)
++-- docs/
+    +-- ARCHITECTURE.md    # System architecture deep dive
+    +-- SETUP.md           # Complete setup guide
+    +-- USAGE.md           # Usage instructions
+    +-- PROTOCOL.md        # WebSocket event protocol reference
+    +-- CONFIGURATION.md   # Environment and configuration reference
+    +-- TROUBLESHOOTING.md # Common issues and solutions
 ```
 
-## Prerequisites
+## What You Need
 
-- **Python 3.10+** — [Download](https://www.python.org/downloads/)
-- **cloudflared** (optional, for internet access) — [Download](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/)
-- **SMTP account** (optional, for email delivery) — Gmail, Outlook, or any SMTP provider
+- **Python 3.10+** — the server and CLI are written in Python
+- **cloudflared** (optional) — for remote internet access via Cloudflare tunnel
+- **SMTP account** (optional) — for emailing the tunnel URL to your phone
 
 ## Quick Start
 
-### 1. Clone and install
+### 1. Install dependencies
+
+Open a terminal in the project directory and install the required Python packages:
 
 ```bash
-git clone <repo-url> remote-mouse
-cd remote-mouse
 pip install -r requirements.txt
 ```
 
-### 2. Configure email (optional)
+### 2. (Optional) Configure email
 
-Copy `.env.example` to `.env` and fill in your SMTP settings:
+Copy the template and fill in your SMTP credentials:
 
 ```bash
 cp .env.example .env
 ```
 
-Edit `.env`:
-
-```ini
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_USERNAME=your.email@gmail.com
-SMTP_PASSWORD=your-app-password
-SMTP_FROM_EMAIL=your.email@gmail.com
-SMTP_TO_EMAIL=your-phone-number@vtext.com
-```
-
-> **Gmail:** Use an [App Password](https://support.google.com/accounts/answer/185833) (not your regular password).
->
-> **SMS gateway:** Send to `number@vtext.com` (Verizon), `number@tmomail.net` (T-Mobile), `number@att.txt` (AT&T), or just a regular email address you check on your phone.
+Edit `.env` with your SMTP settings. For Gmail, you need an App Password (not your regular password). See `docs/CONFIGURATION.md` for details.
 
 ### 3. Start the server
 
-**Windows:**
+**Windows (double-click or command line):**
+
+```powershell
+python cli.py
+```
+
+**Windows (Powershell launcher with tunnel):**
+
 ```powershell
 .\scripts\start.ps1
 ```
 
 **Linux/macOS:**
+
 ```bash
 ./scripts/start.sh
 ```
 
-Or manually:
+**Manual (two terminals):**
 
+Terminal 1 — start the server:
 ```bash
-# Terminal 1: Start the server
 python server.py
+```
 
-# Terminal 2: Start the tunnel (if cloudflared is installed)
+Terminal 2 — start the tunnel (if cloudflared is installed):
+```bash
 cloudflared tunnel --url http://localhost:5000
 ```
 
 ### 4. Connect your phone
 
-- If you configured SMTP: Check your phone's email/SMS — the tunnel URL is there.
-- If running locally: Open `http://<laptop-ip>:5000` in your phone browser.
-- If using the tunnel: Open the `https://*.trycloudflare.com` URL shown in the terminal.
+- If you configured SMTP: Check your phone's email or SMS — the tunnel URL is there. Tap the link.
+- If running locally: Open `http://<laptop-ip>:5000` in your phone browser (both devices on same WiFi).
+- If using the tunnel: Copy the `https://*.trycloudflare.com` URL shown in the terminal.
 
-That's it. The page loads and you can start controlling the mouse immediately.
+That is it. The page loads instantly (socket.io JS is served locally, not from CDN) and you can start controlling the mouse.
 
-## Manual Setup (no email)
+## Use Cases
 
-If you don't want to configure SMTP, just start the server:
+- **Presentations** — control slides from across the room
+- **Media playback** — play/pause, skip tracks, adjust volume without switching apps
+- **Remote desktop** — navigate your laptop from the couch
+- **Smart TV / projector** — if your laptop is plugged into a TV, use your phone as a remote
+- **Accessibility** — use touch gestures instead of a physical mouse
 
-```bash
-python server.py
-```
+## Keyboard Shortcuts Available
 
-The terminal prints the local IP and tunnel URL (if cloudflared is installed). Type the URL into your phone's browser manually.
+The server supports these key combinations via the WebSocket protocol (can be added to the frontend easily):
 
-## Usage
+| Action | Keys |
+|--------|------|
+| Alt+Tab | Switch applications |
+| Win+D | Show desktop |
+| Win+Tab | Task view |
+| Win+L | Lock screen |
+| Escape | Cancel/close |
+| Enter | Confirm |
+| Space | Activate |
 
-### Touchpad
-| Gesture | Action |
-|---------|--------|
-| Single finger drag | Move cursor |
-| Single finger tap | Left click |
-| Two finger drag | Scroll |
-| Left Click button | Left click |
-| Right Click button | Right click |
-| Drag toggle + drag | Hold left button + move (drag) |
+## Performance Notes
 
-### Media Controls
-| Button | Action |
-|--------|--------|
-| ▶ | Play / Pause |
-| ⏮ | Previous track |
-| ⏭ | Next track |
-| 🔊 Volume up | Increase volume |
-| 🔉 Volume down | Decrease volume |
-| 🔇 Mute | Toggle mute |
+- **Latency:** On the same WiFi network, latency is typically under 10ms. Through a Cloudflare tunnel, expect 50-200ms depending on your internet connection.
+- **CDN elimination:** The Socket.IO client library (socket.io.min.js, 49 KB) is served from the laptop's `/static/` directory. This avoids the 3+ minute loading time that would occur if the phone had to download it from a CDN over a metered/hotspot connection.
+- **pyautogui tuning:** `FAILSAFE` is disabled and `PAUSE` is set to 0 for zero-delay mouse movement.
 
-### Sensitivity
-Tap the gear icon (⚙) in the bottom nav to open the sensitivity slider. Adjust from 0.2x to 3.0x.
+## Contributing
 
-## Architecture Details
+This project is designed to be minimal and self-contained. The frontend is a single HTML file with no build tools. The backend is three Python files with no database, no authentication, and no external services except cloudflared and SMTP.
 
-### Server (`server.py`)
-- **Flask** serves `index.html` at `GET /`.
-- **Flask-SocketIO** manages WebSocket connections.
-- **pyautogui** translates WebSocket events into OS mouse/keyboard actions.
-- The server is stateless — no database, no authentication. Connect and control.
-
-### Client (`index.html`)
-- Single HTML file with embedded CSS and JavaScript.
-- Uses the **Socket.IO client library** from CDN for WebSocket communication.
-- Captures touch events using the **Touch Events API**.
-- Haptic feedback via **Navigator.vibrate()** on clicks.
-- Works on any modern mobile browser (Chrome, Safari, Firefox).
-
-### Email Service (`email_service.py`)
-- Reads SMTP configuration from `.env` or environment variables.
-- Supports SSL (port 465) and STARTTLS (port 587).
-- Sends a clean HTML email with the tunnel URL as a tappable link.
-- Retries 3 times with exponential backoff on failure.
-
-### Tunnel (`cloudflared`)
-- Creates a secure HTTPS tunnel from Cloudflare's edge to `localhost:5000`.
-- No port forwarding, no static IP, no DNS configuration needed.
-- The URL is random and temporary — it stops when the tunnel closes.
-
-## Security Notes
-
-- The server has **no authentication**. Anyone on your network (or with the tunnel URL) can control your mouse.
-- The tunnel URL is **random** (64-bit entropy) and **temporary** (only valid while the tunnel runs).
-- For local-only use, don't install cloudflared and only use the local IP.
-
-## Troubleshooting
-
-| Problem | Solution |
-|---------|----------|
-| `cloudflared not found` | Install from [cloudflare.com](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/) or use local network only. |
-| Server won't start | Check port 5000 isn't in use. Change the port in `server.py`. |
-| Phone can't connect locally | Ensure both devices are on the same WiFi network. Check firewall. |
-| WebSocket won't connect | Cloudflare tunnels support WebSocket — ensure you're using the latest `cloudflared`. |
-| Email not sending | Test with `python email_service.py --test`. Check SMTP credentials. Gmail requires an App Password. |
-| Mouse movement feels off | Adjust sensitivity (⚙ icon). Try different sensitivity values. |
-| `pyautogui` not clicking | On macOS, grant Accessibility permissions to Terminal/Python. |
-| Port 5000 already in use | Edit the port in `server.py` or kill the other process. |
+If you want to add features, start by reading `docs/ARCHITECTURE.md` to understand the data flow, then look at the WebSocket protocol in `docs/PROTOCOL.md`.
 
 ## License
 
-MIT
+MIT License — see `LICENSE` for details.
