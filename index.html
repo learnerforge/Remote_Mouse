@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Remote Mouse</title>
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;overflow:hidden;background:#0a0a0a;color:#fff;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
+#app{display:flex;flex-direction:column;height:100%}
+
+/* Status bar */
+#status-bar{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;font-size:12px;color:#666;background:#0d0d0d;border-bottom:1px solid #1a1a1a;min-height:44px}
+#status-bar .dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:8px;background:#555}
+#status-bar .dot.on{background:#4ade80;box-shadow:0 0 6px rgba(74,222,128,.4)}
+#status-ip{color:#444}
+
+/* Pages */
+.page{display:none;flex:1;flex-direction:column}
+.page.active{display:flex}
+
+/* Touchpad page */
+#touchpad{flex:1;display:flex;align-items:center;justify-content:center;touch-action:none;cursor:default;position:relative}
+#touchpad.dim{background:#0d0d0d}
+#touchpad-label{font-size:13px;color:#333;pointer-events:none;transition:opacity .3s}
+#touchpad.dim #touchpad-label{opacity:0}
+#scroll-zone{position:absolute;right:0;top:0;bottom:0;width:36px;background:rgba(255,255,255,.02);display:flex;align-items:center;justify-content:center;font-size:11px;color:#333}
+
+/* Click bar */
+#click-bar{display:flex;padding:6px 8px;gap:6px;background:#0d0d0d;border-top:1px solid #1a1a1a}
+#click-bar button{flex:1;padding:14px 0;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;background:#1a1a1a;color:#fff;transition:background .1s}
+#click-bar button:active{background:#333}
+#click-bar .left{color:#4ade80}
+#click-bar .right{color:#f87171}
+#click-bar .drag-btn{flex:0 0 52px;font-size:18px;color:#888;background:#141414}
+
+/* Media page */
+#media-page{align-items:center;justify-content:center;gap:20px;padding:20px}
+#media-page .row{display:flex;gap:16px;align-items:center;justify-content:center}
+#media-page button{border:none;border-radius:50%;background:#1a1a1a;color:#fff;width:64px;height:64px;font-size:24px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .1s}
+#media-page button:active{background:#333}
+#media-page .big{width:80px;height:80px;font-size:32px;background:#4ade80;color:#000}
+#media-page .big:active{background:#22c55e}
+#media-page .vol-row{width:100%;max-width:320px;display:flex;gap:12px;align-items:center;justify-content:center;margin-top:8px}
+#media-page .vol-row button{width:52px;height:52px;font-size:18px}
+#media-page .vol-row .muted{background:#333;color:#888}
+#media-page .label{font-size:11px;color:#555;text-align:center;margin-top:2px}
+
+/* Link page */
+#link-page{align-items:center;padding:24px 20px;gap:16px}
+#link-page .card{width:100%;max-width:360px;background:#111;border:1px solid #1a1a1a;border-radius:12px;padding:20px}
+#link-page .card h3{font-size:14px;color:#888;margin-bottom:8px;font-weight:400}
+#link-page .card .url{font-size:12px;color:#4ade80;word-break:break-all;padding:10px;background:#0a0a0a;border-radius:8px;line-height:1.5;margin-bottom:6px}
+#link-page .card .copy-btn{font-size:11px;color:#666;background:none;border:none;cursor:pointer;padding:4px 0}
+#link-page .card .copy-btn:active{color:#4ade80}
+#link-page .divider{width:100%;max-width:360px;display:flex;align-items:center;gap:12px;color:#333;font-size:11px}
+#link-page .divider::before,#link-page .divider::after{content:'';flex:1;height:1px;background:#1a1a1a}
+#link-page .email-form{width:100%;max-width:360px;display:flex;flex-direction:column;gap:10px}
+#link-page .email-form input{width:100%;padding:14px 16px;border-radius:10px;border:1px solid #222;background:#111;color:#fff;font-size:14px;outline:none;box-sizing:border-box}
+#link-page .email-form input:focus{border-color:#4ade80}
+#link-page .email-form input::placeholder{color:#555}
+#link-page .email-form button{width:100%;padding:14px;border:none;border-radius:10px;background:#4ade80;color:#000;font-size:15px;font-weight:600;cursor:pointer;transition:opacity .15s}
+#link-page .email-form button:active{opacity:.7}
+#link-page .email-form button:disabled{background:#1a4a2a;color:#555}
+#link-page .msg{font-size:12px;text-align:center;padding:4px 0;min-height:20px}
+#link-page .msg.ok{color:#4ade80}
+#link-page .msg.err{color:#f87171}
+#link-page .msg.wait{color:#888}
+
+/* Bottom nav */
+#bottom-nav{display:flex;border-top:1px solid #1a1a1a;background:#0d0d0d;padding-bottom:env(safe-area-inset-bottom)}
+#bottom-nav button{flex:1;padding:10px 0 8px;background:none;border:none;color:#555;font-size:11px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px;transition:color .2s}
+#bottom-nav button .icon{font-size:20px;line-height:1}
+#bottom-nav button.active{color:#4ade80}
+
+/* Sensitivity panel */
+#sens-panel{position:fixed;bottom:0;left:0;right:0;background:#111;border-top:1px solid #222;padding:16px 20px;padding-bottom:calc(16px + env(safe-area-inset-bottom));transform:translateY(100%);transition:transform .3s;z-index:10}
+#sens-panel.open{transform:translateY(0)}
+#sens-panel .header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+#sens-panel .header span{font-size:13px;color:#888}
+#sens-panel .header button{background:none;border:none;color:#4ade80;font-size:14px;cursor:pointer}
+#sens-panel input[type=range]{width:100%;-webkit-appearance:none;height:4px;border-radius:2px;background:#333;outline:none}
+#sens-panel input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:50%;background:#4ade80;cursor:pointer}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="status-bar">
+    <span><span class="dot" id="status-dot"></span><span id="status-text">Connecting...</span></span>
+    <span id="status-ip"></span>
+  </div>
+
+  <!-- Touchpad Page -->
+  <div class="page active" id="touchpad-page">
+    <div id="touchpad">
+      <span id="touchpad-label">Touch & drag to move</span>
+      <div id="scroll-zone">↕</div>
+    </div>
+    <div id="click-bar">
+      <button class="left" data-button="left">Left</button>
+      <button class="drag-btn" id="drag-toggle" data-drag="0">⊞</button>
+      <button class="right" data-button="right">Right</button>
+    </div>
+  </div>
+
+  <!-- Media Page -->
+  <div class="page" id="media-page">
+    <div class="row">
+      <div><button id="media-prev">⏮</button><div class="label">Previous</div></div>
+      <div><button class="big" id="media-play">▶</button><div class="label">Play/Pause</div></div>
+      <div><button id="media-next">⏭</button><div class="label">Next</div></div>
+    </div>
+    <div class="vol-row">
+      <button id="media-vol-down">🔉</button>
+      <button id="media-mute">🔊</button>
+      <button id="media-vol-up">🔊</button>
+    </div>
+  </div>
+
+  <!-- Link Page -->
+  <div class="page" id="link-page">
+    <div class="card">
+      <h3>Your Tunnel Link</h3>
+      <div class="url" id="tunnel-url-display">Waiting for tunnel...</div>
+      <button class="copy-btn" id="copy-url">📋 Copy to clipboard</button>
+    </div>
+
+    <div class="divider">or email it to your phone</div>
+
+    <div class="email-form">
+      <input type="email" id="email-input" placeholder="Email or SMS gateway address" inputmode="email" autocomplete="email">
+      <button id="send-email-btn">Send to my phone</button>
+      <div class="msg" id="email-msg"></div>
+    </div>
+  </div>
+
+  <!-- Bottom Nav -->
+  <div id="bottom-nav">
+    <button class="active" data-page="touchpad-page"><span class="icon">🖱</span>Touchpad</button>
+    <button data-page="media-page"><span class="icon">🎵</span>Media</button>
+    <button data-page="link-page"><span class="icon">🔗</span>Link</button>
+    <button id="settings-btn"><span class="icon">⚙</span></button>
+  </div>
+
+  <!-- Sensitivity Panel -->
+  <div id="sens-panel">
+    <div class="header">
+      <span>Mouse Sensitivity: <span id="sens-value">1.0</span>x</span>
+      <button id="sens-close">Done</button>
+    </div>
+    <input type="range" id="sens-slider" min="0.2" max="3.0" step="0.1" value="1.0">
+  </div>
+</div>
+
+<script>
+const socket = io({ transports: ['websocket', 'polling'] });
+const statusDot = document.getElementById('status-dot');
+const statusText = document.getElementById('status-text');
+const statusIp = document.getElementById('status-ip');
+const touchpad = document.getElementById('touchpad');
+const touchpadLabel = document.getElementById('touchpad-label');
+const sensSlider = document.getElementById('sens-slider');
+const sensValue = document.getElementById('sens-value');
+const sensPanel = document.getElementById('sens-panel');
+const dragToggle = document.getElementById('drag-toggle');
+
+let sensitivity = 1.0;
+let dragMode = false;
+let touches = {};
+let lastPos = null;
+let activeTouchId = null;
+let touchStartTime = 0;
+let touchMoved = false;
+let pinchDist = null;
+let tunnelUrl = '';
+
+const tunnelUrlDisplay = document.getElementById('tunnel-url-display');
+const copyBtn = document.getElementById('copy-url');
+const emailInput = document.getElementById('email-input');
+const sendBtn = document.getElementById('send-email-btn');
+const emailMsg = document.getElementById('email-msg');
+
+socket.on('connect', () => {
+  statusDot.className = 'dot on';
+  statusText.textContent = 'Connected';
+  socket.emit('request_tunnel_url');
+});
+
+socket.on('disconnect', () => {
+  statusDot.className = 'dot';
+  statusText.textContent = 'Disconnected';
+});
+
+socket.on('screen_info', (data) => {
+  if (data.ip) statusIp.textContent = data.ip;
+  if (data.tunnel_url) updateTunnelUrl(data.tunnel_url);
+});
+
+socket.on('tunnel_url', (data) => {
+  if (data.url) updateTunnelUrl(data.url);
+});
+
+function updateTunnelUrl(url) {
+  tunnelUrl = url;
+  tunnelUrlDisplay.textContent = url;
+  tunnelUrlDisplay.style.color = '#4ade80';
+}
+
+/* --- Fetch tunnel URL from REST API as fallback --- */
+fetch('/api/tunnel-url').then(r => r.json()).then(data => {
+  if (data.url) updateTunnelUrl(data.url);
+}).catch(() => {});
+
+/* --- Copy URL --- */
+copyBtn.addEventListener('click', () => {
+  if (!tunnelUrl) return;
+  navigator.clipboard.writeText(tunnelUrl).then(() => {
+    copyBtn.textContent = '✓ Copied!';
+    setTimeout(() => { copyBtn.textContent = '📋 Copy to clipboard'; }, 2000);
+  }).catch(() => {
+    const ta = document.createElement('textarea');
+    ta.value = tunnelUrl;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    copyBtn.textContent = '✓ Copied!';
+    setTimeout(() => { copyBtn.textContent = '📋 Copy to clipboard'; }, 2000);
+  });
+});
+
+/* --- Send URL via email --- */
+sendBtn.addEventListener('click', () => {
+  const email = emailInput.value.trim();
+  if (!email || !email.includes('@') || !email.includes('.')) {
+    emailMsg.className = 'msg err';
+    emailMsg.textContent = 'Please enter a valid email address.';
+    return;
+  }
+
+  sendBtn.disabled = true;
+  sendBtn.textContent = 'Sending...';
+  emailMsg.className = 'msg wait';
+  emailMsg.textContent = 'Sending...';
+
+  fetch('/api/send-url', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email })
+  }).then(r => r.json()).then(data => {
+    if (data.success) {
+      emailMsg.className = 'msg ok';
+      emailMsg.textContent = '✓ Sent! Check your phone.';
+      emailInput.value = '';
+    } else {
+      emailMsg.className = 'msg err';
+      emailMsg.textContent = data.error || 'Failed to send.';
+    }
+  }).catch(err => {
+    emailMsg.className = 'msg err';
+    emailMsg.textContent = 'Network error. Are you connected?';
+  }).finally(() => {
+    sendBtn.disabled = false;
+    sendBtn.textContent = 'Send to my phone';
+    setTimeout(() => { emailMsg.textContent = ''; }, 8000);
+  });
+});
+
+/* --- Touchpad Logic --- */
+touchpad.addEventListener('touchstart', (e) => {
+  e.preventDefault();
+  touchpad.classList.add('dim');
+
+  for (const t of e.changedTouches) {
+    touches[t.identifier] = { startX: t.clientX, startY: t.clientY, lastX: t.clientX, lastY: t.clientY, startTime: Date.now() };
+  }
+
+  if (e.touches.length === 1) {
+    const t = e.changedTouches[0];
+    lastPos = { x: t.clientX, y: t.clientY };
+    activeTouchId = t.identifier;
+    touchStartTime = Date.now();
+    touchMoved = false;
+  } else if (e.touches.length === 2) {
+    pinchDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+  }
+});
+
+touchpad.addEventListener('touchmove', (e) => {
+  e.preventDefault();
+  const count = e.touches.length;
+
+  if (count === 1) {
+    const t = e.touches[0];
+    const touch = touches[t.identifier];
+    if (touch && lastPos) {
+      let dx = t.clientX - lastPos.x;
+      let dy = t.clientY - lastPos.y;
+
+      if (Math.abs(dx) > 1 || Math.abs(dy) > 1) {
+        touchMoved = true;
+        if (dragMode) {
+          socket.emit('mouse_move', { dx: dx * sensitivity * 1.2, dy: dy * sensitivity * 1.2 });
+        } else {
+          socket.emit('mouse_move', { dx: dx * sensitivity, dy: dy * sensitivity });
+        }
+      }
+      lastPos = { x: t.clientX, y: t.clientY };
+    }
+  } else if (count === 2) {
+    const t1 = e.touches[0];
+    const t2 = e.touches[1];
+    const prev1 = touches[t1.identifier];
+    const prev2 = touches[t2.identifier];
+
+    if (prev1 && prev2) {
+      const avgDy = ((t1.clientY - prev1.y) + (t2.clientY - prev2.y)) / 2;
+      if (Math.abs(avgDy) > 5) {
+        socket.emit('scroll', { dy: avgDy * 2 });
+      }
+    }
+
+    touches[t1.identifier] = { ...touches[t1.identifier], lastX: t1.clientX, lastY: t1.clientY };
+    touches[t2.identifier] = { ...touches[t2.identifier], lastX: t2.clientX, lastY: t2.clientY };
+  }
+});
+
+touchpad.addEventListener('touchend', (e) => {
+  e.preventDefault();
+  for (const t of e.changedTouches) {
+    delete touches[t.identifier];
+  }
+
+  if (e.changedTouches.length === 1 && !touchMoved && Date.now() - touchStartTime < 400) {
+    if (dragMode) {
+      socket.emit('click', { button: 'left' });
+    } else {
+      socket.emit('click', { button: 'left' });
+    }
+    navigator.vibrate && navigator.vibrate(10);
+  }
+
+  if (Object.keys(touches).length === 0) {
+    touchpad.classList.remove('dim');
+    lastPos = null;
+    activeTouchId = null;
+    touchMoved = false;
+    pinchDist = null;
+  }
+});
+
+touchpad.addEventListener('touchcancel', (e) => {
+  touches = {};
+  touchpad.classList.remove('dim');
+  lastPos = null;
+  activeTouchId = null;
+  touchMoved = false;
+});
+
+/* --- Click Buttons --- */
+document.getElementById('click-bar').addEventListener('click', (e) => {
+  const btn = e.target.closest('button');
+  if (!btn || btn.id === 'drag-toggle') return;
+  const button = btn.dataset.button;
+  socket.emit('click', { button });
+  navigator.vibrate && navigator.vibrate(10);
+});
+
+document.getElementById('click-bar').addEventListener('touchstart', (e) => {
+  const btn = e.target.closest('button');
+  if (!btn || btn.id === 'drag-toggle') return;
+  e.preventDefault();
+  const button = btn.dataset.button;
+  socket.emit('click', { button });
+  navigator.vibrate && navigator.vibrate(10);
+});
+
+dragToggle.addEventListener('click', () => {
+  dragMode = !dragMode;
+  dragToggle.dataset.drag = dragMode ? '1' : '0';
+  dragToggle.style.color = dragMode ? '#4ade80' : '#888';
+  dragToggle.textContent = dragMode ? '⊟' : '⊞';
+  navigator.vibrate && navigator.vibrate(10);
+});
+
+/* --- Media Controls --- */
+function mediaAction(action) {
+  socket.emit('media', { action });
+  navigator.vibrate && navigator.vibrate(10);
+}
+
+document.getElementById('media-play').addEventListener('click', () => mediaAction('play_pause'));
+document.getElementById('media-next').addEventListener('click', () => mediaAction('next'));
+document.getElementById('media-prev').addEventListener('click', () => mediaAction('prev'));
+document.getElementById('media-vol-up').addEventListener('click', () => mediaAction('vol_up'));
+document.getElementById('media-vol-down').addEventListener('click', () => mediaAction('vol_down'));
+document.getElementById('media-mute').addEventListener('click', () => mediaAction('mute'));
+
+/* --- Bottom Nav --- */
+document.getElementById('bottom-nav').addEventListener('click', (e) => {
+  const btn = e.target.closest('button');
+  if (!btn) return;
+  const page = btn.dataset.page;
+
+  if (btn.id === 'settings-btn') {
+    sensPanel.classList.toggle('open');
+    return;
+  }
+
+  sensPanel.classList.remove('open');
+  document.querySelectorAll('#bottom-nav button').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById(page).classList.add('active');
+});
+
+/* --- Sensitivity --- */
+sensSlider.addEventListener('input', () => {
+  sensitivity = parseFloat(sensSlider.value);
+  sensValue.textContent = sensitivity.toFixed(1);
+});
+
+document.getElementById('sens-close').addEventListener('click', () => {
+  sensPanel.classList.remove('open');
+});
+</script>
+</body>
+</html>
