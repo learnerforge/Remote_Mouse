@@ -8,7 +8,7 @@ export default function Settings({ emit }: Props) {
   const [globalSensitivity, setGlobalSensitivity] = useState(1.0)
 
   useEffect(() => {
-    emit('smartscroll:config', { sensitivity: globalSensitivity })
+    emit('smart_scroll_config', { sensitivity: globalSensitivity })
   }, [globalSensitivity, emit])
 
   return (

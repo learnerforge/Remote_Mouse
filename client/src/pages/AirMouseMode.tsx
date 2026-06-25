@@ -68,9 +68,9 @@ export default function AirMouseMode({ emit, screenW, screenH }: Props) {
       if (airMode === 'absolute') {
         const absX = Math.max(0, Math.min(1, (gamma + 45) / 90))
         const absY = Math.max(0, Math.min(1, (beta + 45) / 90))
-        emit('airmouse:move', { mode: 'absolute', x: absX, y: absY })
+        emit('airmouse_move', { mode: 'absolute', x: absX, y: absY })
       } else if (Math.abs(smoothX.current) > 1 || Math.abs(smoothY.current) > 1) {
-        emit('airmouse:move', {
+        emit('airmouse_move', {
           mode: 'relative',
           deltaX: smoothX.current,
           deltaY: smoothY.current,
@@ -92,7 +92,7 @@ export default function AirMouseMode({ emit, screenW, screenH }: Props) {
   }, [emit, airMode, calibrate])
 
   const handleClick = useCallback((button: string) => {
-    emit('airmouse:click', { button })
+    emit('airmouse_click', { button })
     navigator.vibrate(10)
   }, [emit])
 

@@ -29,7 +29,7 @@ export default function TouchpadMode({ emit }: Props) {
   const touchOrigins = useRef<Map<number, { x: number; y: number }>>(new Map())
 
   useEffect(() => {
-    emit('smartscroll:config', { invert: invertScroll, sensitivity, decay: momentum ? 0.92 : 1.0 })
+    emit('smart_scroll_config', { invert: invertScroll, sensitivity, decay: momentum ? 0.92 : 1.0 })
   }, [invertScroll, sensitivity, momentum, emit])
 
   const clearTapTimer = () => {
@@ -48,7 +48,7 @@ export default function TouchpadMode({ emit }: Props) {
     } else if (tapCount.current >= 2) {
       clearTapTimer()
       tapCount.current = 0
-      emit('touchpad:event', { type: 'double_tap' })
+      emit('touchpad_event', { type: 'double_tap' })
     }
   }, [emit])
 
@@ -64,17 +64,17 @@ export default function TouchpadMode({ emit }: Props) {
     if (fingers >= 2) {
       if (!scrollActive.current) {
         scrollActive.current = true
-        emit('smartscroll:start')
+        emit('smart_scroll_start')
       }
-      emit('smartscroll:move', { deltaX: dx, deltaY: dy })
+      emit('smart_scroll_move', { deltaX: dx, deltaY: dy })
     } else {
-      emit('touchpad:event', { type: 'move', deltaX: dx, deltaY: dy })
+      emit('touchpad_event', { type: 'move', deltaX: dx, deltaY: dy })
     }
   }, [emit, fingers])
 
   const handlePointerUp = useCallback(() => {
     if (scrollActive.current) {
-      if (momentum) emit('smartscroll:end')
+      if (momentum)       emit('smart_scroll_end')
       scrollActive.current = false
     }
   }, [emit, momentum])
@@ -109,9 +109,9 @@ export default function TouchpadMode({ emit }: Props) {
       last.current = { x: cx, y: cy }
       if (!scrollActive.current) {
         scrollActive.current = true
-        emit('smartscroll:start')
+        emit('smart_scroll_start')
       }
-      emit('smartscroll:move', { deltaX: dx, deltaY: dy })
+      emit('smart_scroll_move', { deltaX: dx, deltaY: dy })
     }
   }, [emit])
 
@@ -134,7 +134,7 @@ export default function TouchpadMode({ emit }: Props) {
       touchOrigins.current.clear()
       if (dirs.length === prevCount && dirs.every(d => d === dirs[0])) {
         const direction = dirs[0]
-        emit('gesture:n_finger_swipe', { fingerCount: prevCount, direction })
+        emit('gesture_n_finger_swipe', { fingerCount: prevCount, direction })
         return
       }
     } else {
@@ -142,10 +142,10 @@ export default function TouchpadMode({ emit }: Props) {
     }
 
     if (prevCount === 2) {
-      emit('touchpad:event', { type: 'two_finger_tap' })
+        emit('touchpad_event', { type: 'two_finger_tap' })
       window.navigator.vibrate?.(10)
     } else if (prevCount === 3) {
-      emit('touchpad:event', { type: 'three_finger_tap' })
+      emit('touchpad_event', { type: 'three_finger_tap' })
       window.navigator.vibrate?.(10)
     }
   }, [emit, fingers])
@@ -156,7 +156,7 @@ export default function TouchpadMode({ emit }: Props) {
 
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault()
-    emit('touchpad:event', { type: 'two_finger_tap' })
+    emit('touchpad_event', { type: 'two_finger_tap' })
   }, [emit])
 
   return (

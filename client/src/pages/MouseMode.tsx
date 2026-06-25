@@ -36,7 +36,7 @@ export default function MouseMode({ emit }: Props) {
     clearGestureTimeout()
     gestureTimeout.current = window.setTimeout(() => {
       longPressFired.current = true
-      emit('mouse:hold')
+      emit('mouse_hold')
       window.navigator.vibrate?.(20)
     }, 600) as unknown as number
   }, [emit])
@@ -44,9 +44,9 @@ export default function MouseMode({ emit }: Props) {
   const handlePointerMove = useCallback((e: React.PointerEvent) => {
     if (e.buttons !== 1) return
     if (longPressFired.current) {
-      emit('mouse:drag', { x: e.clientX, y: e.clientY })
+      emit('mouse_drag', { x: e.clientX, y: e.clientY })
     } else {
-      emit('mouse:event', { type: 'move', x: e.clientX, y: e.clientY })
+      emit('mouse_event', { type: 'move', x: e.clientX, y: e.clientY })
     }
     pointerLast.current = { x: e.clientX, y: e.clientY }
   }, [emit])
@@ -60,7 +60,7 @@ export default function MouseMode({ emit }: Props) {
     const dx = e.clientX - pointerLast.current.x
     const dy = e.clientY - pointerLast.current.y
     if (Math.sqrt(dx * dx + dy * dy) < 15) {
-      emit('click:left')
+      emit('click_left')
     }
   }, [emit])
 
@@ -89,7 +89,7 @@ export default function MouseMode({ emit }: Props) {
       }
       touchOrigins.current.clear()
       if (dirs.length === prevFingers && dirs.every(d => d === dirs[0])) {
-        emit('gesture:n_finger_swipe', { fingerCount: prevFingers, direction: dirs[0] })
+        emit('gesture_n_finger_swipe', { fingerCount: prevFingers, direction: dirs[0] })
         return
       }
     } else {
@@ -97,10 +97,10 @@ export default function MouseMode({ emit }: Props) {
     }
 
     if (prevFingers === 2) {
-      emit('click:right')
+      emit('click_right')
       window.navigator.vibrate?.(10)
     } else if (prevFingers === 3) {
-      emit('click:double')
+      emit('click_double')
       window.navigator.vibrate?.(10)
     }
   }, [emit, fingers])
@@ -119,7 +119,7 @@ export default function MouseMode({ emit }: Props) {
         onPointerLeave={() => {
           clearGestureTimeout()
           if (longPressFired.current) {
-            emit('mouse:release')
+      emit('mouse_release')
           }
         }}
         onTouchStart={handleTouchStart}

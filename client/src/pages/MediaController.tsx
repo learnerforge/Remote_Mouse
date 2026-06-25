@@ -6,7 +6,7 @@ interface Props {
 
 export default function MediaController({ emit }: Props) {
   const action = useCallback((a: string) => {
-    emit('media:action', { action: a })
+    emit('media_action', { action: a })
     window.navigator.vibrate?.(10)
   }, [emit])
 

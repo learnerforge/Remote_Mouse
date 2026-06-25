@@ -8,7 +8,7 @@ export default function PresentationMode({ emit }: Props) {
   const [pointerActive, setPointerActive] = useState(false)
 
   const action = useCallback((a: string) => {
-    emit('presentation:action', { action: a })
+    emit('presentation_action', { action: a })
     window.navigator.vibrate?.(10)
   }, [emit])
 

@@ -20,7 +20,7 @@ export function useSocket() {
     socket.on('connect', () => {
       setConnected(true)
       const savedToken = localStorage.getItem(TOKEN_KEY) || ''
-      socket.emit('session:restore', { token: savedToken })
+      socket.emit('session_restore', { token: savedToken })
     })
 
     socket.on('session:created', ({ token, screenWidth, screenHeight }) => {
@@ -41,6 +41,11 @@ export function useSocket() {
       if (height) setScreenH(height)
     })
 
+    socket.on('mode:switched', ({ screenWidth, screenHeight }) => {
+      if (screenWidth) setScreenW(screenWidth)
+      if (screenHeight) setScreenH(screenHeight)
+    })
+
     socket.on('disconnect', () => setConnected(false))
     socket.on('pair:code', ({ code }) => setPairCode(code))
     socket.on('pair:success', () => { setPairStatus(true); setPairCode(null) })
@@ -56,8 +61,8 @@ export function useSocket() {
     }
   }, [])
 
-  const requestPairing = useCallback(() => ref.current?.emit('pair:request'), [])
-  const verifyPairing = useCallback((code: string) => ref.current?.emit('pair:verify', { code }), [])
+  const requestPairing = useCallback(() => ref.current?.emit('pair_request'), [])
+  const verifyPairing = useCallback((code: string) => ref.current?.emit('pair_verify', { code }), [])
   const emit = useCallback((event: string, data?: any) => { ref.current?.emit(event, data) }, [])
 
   return { connected, pairStatus, pairCode, screenW, screenH, requestPairing, verifyPairing, emit }
