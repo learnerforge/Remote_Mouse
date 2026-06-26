@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Protocol — Remote Mouse Docs</title>
+<link rel="stylesheet" href="../css/style.css">
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({startOnLoad:true,theme:'dark',fontSize:13})</script>
+</head>
+<body>
+<nav>
+<h2>Remote Mouse</h2>
+<ul><li><a href="index.html">Home</a></li>
+<li><a href="architecture.html">Architecture</a></li>
+<li><a href="configuration.html">Configuration</a></li>
+<li><a href="protocol.html" class="active">Protocol</a></li>
+<li><a href="troubleshooting.html">Troubleshooting</a></li>
+<li><a href="comparison.html">Comparison</a></li></ul>
+<div class="section-title">Reference</div>
+<ul>
+<li><a href="index.html">Home</a></li>
+<li><a href="architecture.html">Architecture</a></li>
+<li><a href="configuration.html">Configuration</a></li>
+<li><a href="protocol.html" class="active">Protocol</a></li>
+<li><a href="troubleshooting.html">Troubleshooting</a></li>
+<li><a href="comparison.html">Comparison</a></li>
+</ul>
+</nav>
+<main>
+<h1>WebSocket Protocol</h1>
+
+<p><strong>Version:</strong> v1.0.0  </p>
+<p><strong>Last updated:</strong> 2026-06-26</p>
+
+<p>This document describes the WebSocket protocol between the phone browser and the Python server. All events use Socket.IO, which provides WebSocket with automatic HTTP long-polling fallback, reconnection, and event routing.</p>
+
+<hr>
+
+<h2>Transport</h2>
+
+<table>
+<tr><th>Property</th><th>Value</th></tr>
+<tr><td>----------</td><td>-------</td></tr>
+<tr><td><strong>Primary</strong></td><td>WebSocket</td></tr>
+<tr><td><strong>Fallback</strong></td><td>HTTP long-polling (Socket.IO auto-negotiates)</td></tr>
+<tr><td><strong>Library</strong></td><td>Socket.IO v4 (client: 4.7.5, server: Flask-SocketIO 5.x)</td></tr>
+<tr><td><strong>Connection URL</strong></td><td>Same as page URL (<code>http://laptop:5000</code> or <code>https://tunnel.trycloudflare.com</code>)</td></tr>
+<tr><td><strong>Client transports</strong></td><td><code>['websocket', 'polling']</code></td></tr>
+<tr><td><strong>Ping interval</strong></td><td>5 seconds</td></tr>
+<tr><td><strong>Ping timeout</strong></td><td>3 seconds</td></tr>
+</table>
+
+<h3>Handshake</h3>
+
+<pre class="mermaid">sequenceDiagram
+    participant Client as Phone Browser
+    participant Server as Python Server
+
+    Client-&gt;&gt;Server: HTTP GET /
+    Server--&gt;&gt;Client: index.html (no-cache)
+
+    Client-&gt;&gt;Server: HTTP GET /static/socket.io.min.js
+    Server--&gt;&gt;Client: socket.io.min.js (max-age=86400)
+
+    Client-&gt;&gt;Server: Socket.IO open packet (HTTP POST)
+    Server--&gt;&gt;Client: Socket.IO open response (transport, sid)
+
+    alt WebSocket Available
+        Client-&gt;&gt;Server: WebSocket upgrade request
+        Server--&gt;&gt;Client: 101 Switching Protocols
+        Note over Client,Server: Native WebSocket active
+    else WebSocket Blocked
+        Note over Client,Server: HTTP long-polling fallback
+        loop Every ~25s
+            Client-&gt;&gt;Server: HTTP POST (data)
+            Server--&gt;&gt;Client: HTTP 200 OK
+            Client-&gt;&gt;Server: HTTP GET (poll)
+            Server--&gt;&gt;Client: HTTP 200 OK
+        end
+    end
+
+    Client-&gt;&gt;Server: socket.emit(&quot;connect&quot;, auth)
+    Server--&gt;&gt;Client: socket.emit(&quot;screen_info&quot;, {width, height, ip, tunnel_url})</pre>
+
+<h3>Client Connection Options</h3>
+
+<pre><code>const socket = io({
+  transports: [&#x27;websocket&#x27;, &#x27;polling&#x27;],
+  reconnection: true,
+  reconnectionAttempts: Infinity,
+  reconnectionDelay: 1000,
+  reconnectionDelayMax: 5000,
+});</code></pre>
+
+<hr>
+
+<h2>Event Reference</h2>
+
+<h3>Server-to-Client Events</h3>
+
+<h4><code>screen_info</code></h4>
+
+<p>Sent automatically when a client connects. Contains laptop screen dimensions and connection URLs.</p>
+
+<pre><code>{
+  &quot;width&quot;: 1920,
+  &quot;height&quot;: 1080,
+  &quot;ip&quot;: &quot;10.0.0.5&quot;,
+  &quot;tunnel_url&quot;: &quot;https://abcdefgh123456.trycloudflare.com&quot;
+}</code></pre>
+
+<table>
+<tr><th>Field</th><th>Type</th><th>Description</th></tr>
+<tr><td>-------</td><td>------</td><td>-------------</td></tr>
+<tr><td><code>width</code></td><td>int</td><td>Screen width in pixels</td></tr>
+<tr><td><code>height</code></td><td>int</td><td>Screen height in pixels</td></tr>
+<tr><td><code>ip</code></td><td>string</td><td>Local IP address of the laptop</td></tr>
+<tr><td><code>tunnel_url</code></td><td>string</td><td>Cloudflare tunnel URL (empty string if no tunnel)</td></tr>
+</table>
+
+<h4><code>tunnel_url</code></h4>
+
+<p>Sent in response to <code>request_tunnel_url</code>. Provides the current tunnel URL.</p>
+
+<pre><code>{
+  &quot;url&quot;: &quot;https://abcdefgh123456.trycloudflare.com&quot;
+}</code></pre>
+
+<table>
+<tr><th>Field</th><th>Type</th><th>Description</th></tr>
+<tr><td>-------</td><td>------</td><td>-------------</td></tr>
+<tr><td><code>url</code></td><td>string</td><td>Current tunnel URL (empty if no active tunnel)</td></tr>
+</table>
+
+<hr>
+
+<h3>Client-to-Server Events</h3>
+
+<h4><code>mouse_move</code></h4>
+
+<p>Sent when the user drags a finger on the touchpad. The most frequent event.</p>
+
+<pre class="mermaid">sequenceDiagram
+    participant Touch as Phone Touchscreen
+    participant JS as index.html JS
+    participant Server as Python Server
+    participant OS as Operating System
+
+    Touch-&gt;&gt;JS: touchmove {dx, dy}
+    JS-&gt;&gt;JS: Apply sensitivity
+    JS-&gt;&gt;JS: Apply drag mode multiplier (1.2x if active)
+    JS-&gt;&gt;JS: Dead zone check (&gt;1px)
+    JS-&gt;&gt;Server: socket.emit(&quot;mouse_move&quot;, {dx, dy})
+    Server-&gt;&gt;OS: pyautogui.moveRel(int(dx), int(dy))
+    Server-&gt;&gt;Server: log_info(&quot;move (+0012, -0005)&quot;)</pre>
+
+<p><strong>Payload:</strong></p>
+
+<pre><code>{
+  &quot;dx&quot;: 45,
+  &quot;dy&quot;: -23
+}</code></pre>
+
+<table>
+<tr><th>Field</th><th>Type</th><th>Range</th><th>Description</th></tr>
+<tr><td>-------</td><td>------</td><td>-------</td><td>-------------</td></tr>
+<tr><td><code>dx</code></td><td>int</td><td>-500 to +500</td><td>Delta X (positive = right, negative = left)</td></tr>
+<tr><td><code>dy</code></td><td>int</td><td>-500 to +500</td><td>Delta Y (positive = down, negative = up)</td></tr>
+</table>
+
+<p><strong>Server handler:</strong></p>
+
+<pre><code>@socketio.on(&#x27;mouse_move&#x27;)
+def handle_move(data):
+    dx = data.get(&#x27;dx&#x27;, 0)
+    dy = data.get(&#x27;dy&#x27;, 0)
+    if dx != 0 or dy != 0:
+        pyautogui.moveRel(int(dx), int(dy), _pause=False)</code></pre>
+
+<p><strong>Notes:</strong></p>
+<ul>
+<li>Delta is pre-scaled by client-side sensitivity (0.2x–3.0x) and drag mode multiplier (1.2x)</li>
+<li>Dead zone of 1px prevents micro-jitter from being sent</li>
+<li>Server casts to <code>int()</code> for pixel-perfect movement</li>
+<li><code>_pause=False</code> skips pyautogui's 100ms delay</li>
+</ul>
+
+<hr>
+
+<h4><code>click</code></h4>
+
+<p>Sent on touchpad tap or click bar button press.</p>
+
+<pre class="mermaid">sequenceDiagram
+    participant Touch as Phone Touchscreen
+    participant JS as index.html JS
+    participant Server as Python Server
+    participant OS as Operating System
+
+    Touch-&gt;&gt;JS: touchend
+    JS-&gt;&gt;JS: Check duration &lt; 400ms
+    JS-&gt;&gt;JS: Check no significant movement
+    JS-&gt;&gt;JS: navigator.vibrate(10)
+    JS-&gt;&gt;Server: socket.emit(&quot;click&quot;, {button: &quot;left&quot;})
+    Server-&gt;&gt;OS: pyautogui.click(button=&#x27;left&#x27;)
+    Server-&gt;&gt;Server: log_info(&quot;click left&quot;)</pre>
+
+<p><strong>Payload:</strong></p>
+
+<pre><code>{
+  &quot;button&quot;: &quot;left&quot;
+}</code></pre>
+
+<pre><code>{
+  &quot;button&quot;: &quot;right&quot;
+}</code></pre>
+
+<table>
+<tr><th>Field</th><th>Type</th><th>Values</th><th>Description</th></tr>
+<tr><td>-------</td><td>------</td><td>--------</td><td>-------------</td></tr>
+<tr><td><code>button</code></td><td>string</td><td><code>"left"</code> or <code>"right"</code></td><td>Which mouse button to click</td></tr>
+</table>
+
+<p><strong>Server handler:</strong></p>
+
+<pre><code>@socketio.on(&#x27;click&#x27;)
+def handle_click(data):
+    button = data.get(&#x27;button&#x27;, &#x27;left&#x27;)
+    pyautogui.click(button=button, _pause=False)</code></pre>
+
+<p><strong>Tap detection logic (client-side):</strong></p>
+
+<pre><code>// In touchend handler:
+if (e.changedTouches.length === 1 &amp;&amp; !touchMoved &amp;&amp; Date.now() - touchStartTime &lt; 400) {
+    socket.emit(&#x27;click&#x27;, { button: &#x27;left&#x27; });
+    navigator.vibrate(10);
+}</code></pre>
+
+<p>Three conditions must ALL be true:</p>
+<ol>
+<li>Exactly 1 finger lifted</li>
+<li>No significant movement occurred during the touch</li>
+<li>Touch duration under 400ms</li>
+</ol>
+
+<hr>
+
+<h4><code>scroll</code></h4>
+
+<p>Sent on two-finger vertical drag.</p>
+
+<pre class="mermaid">sequenceDiagram
+    participant Touch as Phone Touchscreen
+    participant JS as index.html JS
+    participant Server as Python Server
+    participant OS as Operating System
+
+    Touch-&gt;&gt;JS: touchstart (2 fingers)
+    JS-&gt;&gt;JS: Store finger 1 + 2 start positions
+    Touch-&gt;&gt;JS: touchmove (2 fingers)
+    JS-&gt;&gt;JS: Average dy from both fingers
+    JS-&gt;&gt;Server: socket.emit(&quot;scroll&quot;, {dy: 120})
+    Server-&gt;&gt;Server: clicks = max(1, round(120/20)) = 6
+    Server-&gt;&gt;OS: pyautogui.scroll(-6)
+    Server-&gt;&gt;Server: log_info(&quot;scroll (+00120)&quot;)</pre>
+
+<p><strong>Payload:</strong></p>
+
+<pre><code>{
+  &quot;dy&quot;: 120
+}</code></pre>
+
+<table>
+<tr><th>Field</th><th>Type</th><th>Description</th></tr>
+<tr><td>-------</td><td>------</td><td>-------------</td></tr>
+<tr><td><code>dy</code></td><td>int</td><td>Scroll delta in pixels (positive = scroll down, negative = scroll up)</td></tr>
+</table>
+
+<p><strong>Server handler:</strong></p>
+
+<pre><code>@socketio.on(&#x27;scroll&#x27;)
+def handle_scroll(data):
+    dy = data.get(&#x27;dy&#x27;, 0)
+    if dy != 0:
+        clicks = max(1, abs(int(dy / 20)))
+        pyautogui.scroll(-clicks if dy &gt; 0 else clicks, _pause=False)</code></pre>
+
+<p><strong>Mapping:</strong></p>
+<ul>
+<li>Pixel delta → clicks (notches): divide by 20</li>
+<li>Positive dy (finger moves up) → scroll content down (negative pyautogui value)</li>
+<li>Minimum 1 click always sent</li>
+</ul>
+
+<hr>
+
+<h4><code>media</code></h4>
+
+<p>Sent on media control button press. Triggers system-wide media keys.</p>
+
+<p><strong>Payload:</strong></p>
+
+<pre><code>{
+  &quot;action&quot;: &quot;play_pause&quot;
+}</code></pre>
+
+<table>
+<tr><th>Field</th><th>Type</th><th>Allowed Values</th><th>Description</th></tr>
+<tr><td>-------</td><td>------</td><td>----------------</td><td>-------------</td></tr>
+<tr><td><code>action</code></td><td>string</td><td><code>play_pause</code>, <code>next</code>, <code>prev</code>, <code>vol_up</code>, <code>vol_down</code>, <code>mute</code></td><td>Which media action</td></tr>
+</table>
+
+<p><strong>Action-to-key mapping:</strong></p>
+
+<table>
+<tr><th>Frontend button</th><th><code>action</code> value</th><th>pyautogui key</th><th>OS effect</th></tr>
+<tr><td>-----------------</td><td>----------------</td><td>---------------</td><td>-----------</td></tr>
+<tr><td>Play/Pause (big center)</td><td><code>play_pause</code></td><td><code>playpause</code></td><td>Toggle playback</td></tr>
+<tr><td>Next (skip forward)</td><td><code>next</code></td><td><code>nexttrack</code></td><td>Next track</td></tr>
+<tr><td>Prev (skip back)</td><td><code>prev</code></td><td><code>prevtrack</code></td><td>Previous track</td></tr>
+<tr><td>Volume +</td><td><code>vol_up</code></td><td><code>volumeup</code></td><td>Increase volume (2% on Windows)</td></tr>
+<tr><td>Volume -</td><td><code>vol_down</code></td><td><code>volumedown</code></td><td>Decrease volume (2% on Windows)</td></tr>
+<tr><td>Mute</td><td><code>mute</code></td><td><code>volumemute</code></td><td>Toggle mute</td></tr>
+</table>
+
+<p><strong>Server handler:</strong></p>
+
+<pre><code>@socketio.on(&#x27;media&#x27;)
+def handle_media(data):
+    action = data.get(&#x27;action&#x27;, &#x27;&#x27;)
+    key_map = {
+        &#x27;play_pause&#x27;: &#x27;playpause&#x27;,
+        &#x27;next&#x27;: &#x27;nexttrack&#x27;,
+        &#x27;prev&#x27;: &#x27;prevtrack&#x27;,
+        &#x27;vol_up&#x27;: &#x27;volumeup&#x27;,
+        &#x27;vol_down&#x27;: &#x27;volumedown&#x27;,
+        &#x27;mute&#x27;: &#x27;volumemute&#x27;,
+    }
+    key = key_map.get(action)
+    if key:
+        pyautogui.press(key, _pause=False)</code></pre>
+
+<p><strong>Notes:</strong></p>
+<ul>
+<li>System-wide keys — work with any active media app (Spotify, VLC, YouTube)</li>
+<li>pyautogui sends a single key press (not held)</li>
+<li>Volume change amount depends on OS (Windows ~2%, macOS ~1 notch)</li>
+</ul>
+
+<hr>
+
+<h4><code>request_tunnel_url</code></h4>
+
+<p>Sent by the client to request the current tunnel URL. No payload.</p>
+
+<pre><code>{}</code></pre>
+
+<p><strong>Server response:</strong> Emits <code>tunnel_url</code> event with the current URL.</p>
+
+<p><strong>Frontend usage:</strong></p>
+
+<pre><code>socket.emit(&#x27;request_tunnel_url&#x27;);
+// Server responds with: socket.emit(&#x27;tunnel_url&#x27;, { url: &#x27;https://...&#x27; })</code></pre>
+
+<p>Sent automatically on connection to populate the Link page, and when the user taps "Refresh" on the Link page.</p>
+
+<hr>
+
+<h2>REST API Endpoints</h2>
+
+<pre class="mermaid">graph TB
+    subgraph API[&quot;REST API (HTTP)&quot;]
+        TUNNEL[&quot;GET /api/tunnel-url&lt;br/&gt;→ {url, local_ip}&quot;]
+        SEND[&quot;POST /api/send-url&lt;br/&gt;→ {success} | {error}&quot;]
+        START[&quot;POST /api/setup-start&lt;br/&gt;→ {success} | {error}&quot;]
+        STATUS[&quot;GET /api/setup-status&lt;br/&gt;→ {running, done, logs[]}&quot;]
+    end</pre>
+
+<h3>GET /api/tunnel-url</h3>
+
+<p>Returns current tunnel URL and local IP.</p>
+
+<pre><code>{
+  &quot;url&quot;: &quot;https://abcdefgh123456.trycloudflare.com&quot;,
+  &quot;local_ip&quot;: &quot;10.0.0.5&quot;
+}</code></pre>
+
+<p><strong>Status codes:</strong> <code>200 OK</code></p>
+
+<p><strong>Frontend usage (fallback when WebSocket is disconnected):</strong></p>
+
+<pre><code>fetch(&#x27;/api/tunnel-url&#x27;)
+  .then(r =&gt; r.json())
+  .then(data =&gt; {
+    if (data.url) updateTunnelUrl(data.url);
+  });</code></pre>
+
+<hr>
+
+<h3>POST /api/send-url</h3>
+
+<p>Sends tunnel URL to a specified email via SMTP.</p>
+
+<p><strong>Request:</strong></p>
+
+<pre><code>{
+  &quot;email&quot;: &quot;user@example.com&quot;
+}</code></pre>
+
+<p><strong>Success <code>200</code>:</strong></p>
+
+<pre><code>{
+  &quot;success&quot;: true,
+  &quot;message&quot;: &quot;Tunnel URL sent to user@example.com&quot;
+}</code></pre>
+
+<p><strong>Error <code>400</code>:</strong></p>
+
+<pre><code>{ &quot;error&quot;: &quot;Invalid email address&quot; }
+{ &quot;error&quot;: &quot;No tunnel URL available&quot; }</code></pre>
+
+<p><strong>Error <code>500</code>:</strong></p>
+
+<pre><code>{ &quot;error&quot;: &quot;Failed to send email: connection refused&quot; }</code></pre>
+
+<hr>
+
+<h3>POST /api/setup-start</h3>
+
+<p>Starts the setup wizard workflow in a background thread.</p>
+
+<p><strong>Request:</strong></p>
+
+<pre><code>{
+  &quot;case&quot;: &quot;remote&quot;,
+  &quot;email&quot;: &quot;user@example.com&quot;
+}</code></pre>
+
+<table>
+<tr><th>Field</th><th>Required</th><th>Values</th><th>Description</th></tr>
+<tr><td>-------</td><td>----------</td><td>--------</td><td>-------------</td></tr>
+<tr><td><code>case</code></td><td>Yes</td><td><code>same-wifi</code>, <code>remote</code>, <code>localhost</code></td><td>Connection type</td></tr>
+<tr><td><code>email</code></td><td>For <code>remote</code></td><td>Valid email</td><td>Recipient for tunnel URL</td></tr>
+</table>
+
+<p><strong>Response <code>200</code>:</strong></p>
+
+<pre><code>{ &quot;success&quot;: true }</code></pre>
+
+<p><strong>Error <code>400</code>:</strong></p>
+
+<pre><code>{ &quot;error&quot;: &quot;Invalid case. Choose same-wifi, remote, or localhost&quot; }
+{ &quot;error&quot;: &quot;Email required for remote access&quot; }</code></pre>
+
+<p><strong>Setup workflow:</strong></p>
+
+<pre class="mermaid">sequenceDiagram
+    participant Client as Phone Browser
+    participant API as Flask API
+    participant Thread as Background Thread
+
+    Client-&gt;&gt;API: POST /api/setup-start {case, email}
+    API-&gt;&gt;Thread: Start daemon thread
+    API--&gt;&gt;Client: {success: true}
+
+    loop Poll every 1s
+        Client-&gt;&gt;API: GET /api/setup-status
+        API--&gt;&gt;Client: {running, done, logs[], error}
+    end
+
+    alt case: localhost
+        Thread-&gt;&gt;Thread: Log &quot;Open http://127.0.0.1:5000&quot;
+    else case: same-wifi
+        Thread-&gt;&gt;Thread: Log &quot;Open http://{ip}:5000&quot;
+    else case: remote
+        Thread-&gt;&gt;Thread: Start cloudflared
+        Thread-&gt;&gt;Thread: Detect tunnel URL
+        Thread-&gt;&gt;Thread: Send email via SMTP
+        Thread-&gt;&gt;Thread: Log URL + email status
+    end
+
+    Thread-&gt;&gt;Thread: Set running=false, done=true</pre>
+
+<hr>
+
+<h3>GET /api/setup-status</h3>
+
+<p>Returns current setup state for polling.</p>
+
+<pre><code>{
+  &quot;running&quot;: false,
+  &quot;done&quot;: true,
+  &quot;case&quot;: &quot;remote&quot;,
+  &quot;email&quot;: true,
+  &quot;error&quot;: null,
+  &quot;tunnel_url&quot;: &quot;https://abcdefgh123456.trycloudflare.com&quot;,
+  &quot;local_ip&quot;: &quot;10.0.0.5&quot;,
+  &quot;logs&quot;: [
+    &quot;[19:30:22] OK Case: Remote&quot;,
+    &quot;[19:30:22] INFO Starting cloudflared tunnel...&quot;,
+    &quot;[19:30:25] OK Tunnel URL: https://...&quot;
+  ]
+}</code></pre>
+
+<table>
+<tr><th>Field</th><th>Type</th><th>Description</th></tr>
+<tr><td>-------</td><td>------</td><td>-------------</td></tr>
+<tr><td><code>running</code></td><td>bool</td><td>Setup in progress</td></tr>
+<tr><td><code>done</code></td><td>bool</td><td>Setup completed</td></tr>
+<tr><td><code>case</code></td><td>string</td><td>Selected connection case</td></tr>
+<tr><td><code>email</code></td><td>bool</td><td>Email was provided</td></tr>
+<tr><td><code>error</code></td><td>string</td><td>Error message (null if no error)</td></tr>
+<tr><td><code>tunnel_url</code></td><td>string</td><td>Current tunnel URL</td></tr>
+<tr><td><code>local_ip</code></td><td>string</td><td>Laptop's local IP</td></tr>
+<tr><td><code>logs</code></td><td>string[]</td><td>Recent log entries (max 100)</td></tr>
+</table>
+
+<hr>
+
+<h2>Reconnection Behavior</h2>
+
+<pre class="mermaid">stateDiagram-v2
+    [*] --&gt; Connected: WebSocket open
+    Connected --&gt; Disconnected: Network failure\nServer stop\nTunnel timeout
+    Disconnected --&gt; Reconnecting: 1s delay
+    Reconnecting --&gt; Connected: Retry success
+    Reconnecting --&gt; Reconnecting: Retry fail\nExponential backoff\n1s → 2s → 4s → 5s (max)
+    Disconnected --&gt; [*]: Page closed
+
+    state Disconnected {
+        [*] --&gt; ShowReconnecting: Status bar shows\n&quot;Reconnecting (n)...&quot;
+    }</pre>
+
+<p><strong>Client-side reconnection config:</strong></p>
+<ul>
+<li><code>reconnectionAttempts: Infinity</code> — never gives up</li>
+<li><code>reconnectionDelay: 1000</code> — 1 second initial delay</li>
+<li><code>reconnectionDelayMax: 5000</code> — max 5 second delay</li>
+</ul>
+
+<p><strong>Status bar indicators:</strong></p>
+<table>
+<tr><th>State</th><th>Dot Color</th><th>Text</th></tr>
+<tr><td>-------</td><td>-----------</td><td>------</td></tr>
+<tr><td>Connected</td><td>Green</td><td>"Connected"</td></tr>
+<tr><td>Disconnected</td><td>Gray</td><td>"Disconnected"</td></tr>
+<tr><td>Reconnecting</td><td>Yellow</td><td>"Reconnecting (3)..."</td></tr>
+</table>
+
+<hr>
+
+<h2>Error Handling (Server-Side)</h2>
+
+<p>All events are guarded against missing or malformed data using <code>.get()</code> with defaults:</p>
+
+<pre><code>dx = data.get(&#x27;dx&#x27;, 0)
+dy = data.get(&#x27;dy&#x27;, 0)
+button = data.get(&#x27;button&#x27;, &#x27;left&#x27;)
+action = data.get(&#x27;action&#x27;, &#x27;&#x27;)</code></pre>
+
+<p>Each handler checks for meaningful values before acting (e.g., <code>if dx != 0 or dy != 0</code>). Invalid or empty events are silently ignored.</p>
+
+<hr>
+
+<h2>Extending the Protocol</h2>
+
+<p>To add a new event:</p>
+
+<ol>
+<li><strong>Client side (<code>index.html</code>):</strong> Call <code>socket.emit('event_name', payload)</code> where needed</li>
+<li><strong>Server side (<code>server.py</code>):</strong> Add <code>@socketio.on('event_name')</code> handler</li>
+<li><strong>This doc:</strong> Add the event reference</li>
+</ol>
+
+<p><strong>Example — screenshot trigger:</strong></p>
+
+<pre><code>@socketio.on(&#x27;screenshot&#x27;)
+def handle_screenshot():
+    import pyautogui
+    from datetime import datetime
+    img = pyautogui.screenshot()
+    img.save(f&#x27;screenshot_{datetime.now():%Y%m%d_%H%M%S}.png&#x27;)
+    log_ok(f&quot;screenshot saved&quot;)</code></pre>
+
+<p>Payload can be any JSON-serializable object. Server handler can call any pyautogui function, execute shell commands, or perform any action.</p>
+
+</main>
+</body>
+</html>

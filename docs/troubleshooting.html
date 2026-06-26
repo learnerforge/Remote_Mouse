@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Troubleshooting — Remote Mouse Docs</title>
+<link rel="stylesheet" href="../css/style.css">
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({startOnLoad:true,theme:'dark',fontSize:13})</script>
+</head>
+<body>
+<nav>
+<h2>Remote Mouse</h2>
+<ul><li><a href="index.html">Home</a></li>
+<li><a href="architecture.html">Architecture</a></li>
+<li><a href="configuration.html">Configuration</a></li>
+<li><a href="protocol.html">Protocol</a></li>
+<li><a href="troubleshooting.html" class="active">Troubleshooting</a></li>
+<li><a href="comparison.html">Comparison</a></li></ul>
+<div class="section-title">Reference</div>
+<ul>
+<li><a href="index.html">Home</a></li>
+<li><a href="architecture.html">Architecture</a></li>
+<li><a href="configuration.html">Configuration</a></li>
+<li><a href="protocol.html">Protocol</a></li>
+<li><a href="troubleshooting.html" class="active">Troubleshooting</a></li>
+<li><a href="comparison.html">Comparison</a></li>
+</ul>
+</nav>
+<main>
+<h1>Troubleshooting</h1>
+
+<p><strong>Version:</strong> v1.0.0  </p>
+<p><strong>Last updated:</strong> 2026-06-26</p>
+
+<p>This document covers common issues, their causes, and how to fix them. If a problem is not listed here, check the server logs (CLI output or <code>events.log</code>) for error messages.</p>
+
+<hr>
+
+<h2>Quick Reference</h2>
+
+<table>
+<tr><th>Problem</th><th>Quick Fix</th></tr>
+<tr><td>---------</td><td>-----------</td></tr>
+<tr><td>Page won't load on phone</td><td>Check WiFi / same network / firewall</td></tr>
+<tr><td>WebSocket won't connect</td><td>Check server is running / correct URL</td></tr>
+<tr><td>Mouse moves but lags</td><td>Reduce sensitivity / check network latency</td></tr>
+<tr><td>Clicks not working</td><td>Check server logs / pyautogui permissions</td></tr>
+<tr><td>Email not sending</td><td>Run <code>python src/email_service.py --test</code></td></tr>
+<tr><td>Tunnel URL not appearing</td><td>Check cloudflared installed and started</td></tr>
+<tr><td>CLI shows "Server stopped"</td><td>Port in use / check <code>server.log</code></td></tr>
+<tr><td>Two-finger scroll not working</td><td>Use 2 fingers, check scroll zone</td></tr>
+<tr><td>DPI presets not responding</td><td>Check index.html v1.0.0 preset buttons</td></tr>
+</table>
+
+<hr>
+
+<h2>Connection Issues</h2>
+
+<h3>Decision Tree: Phone Cannot Load the Page</h3>
+
+<pre class="mermaid">graph TD
+    START[&quot;Phone can&#x27;t load page&quot;] --&gt; SAME_NET{&quot;Same WiFi network?&quot;}
+    SAME_NET -- No --&gt; FIX_NET[&quot;Connect phone to same network as laptop&quot;]
+    SAME_NET -- Yes --&gt; SERVER_RUN{&quot;Server running?&lt;br/&gt;Check terminal output&quot;}
+
+    SERVER_RUN -- No --&gt; START_SERVER[&quot;Run: python src/cli.py&lt;br/&gt;or python src/server.py&quot;]
+    SERVER_RUN -- Yes --&gt; FIREWALL{&quot;Firewall blocking port 5000?&quot;}
+
+    FIREWALL -- Yes --&gt; ADD_RULE[&quot;netsh advfirewall firewall&lt;br/&gt;add rule name=&#x27;Remote Mouse 5000&#x27;&lt;br/&gt;dir=in action=allow protocol=TCP localport=5000&quot;]
+    FIREWALL -- No --&gt; URL{&quot;Using correct URL?&lt;br/&gt;http://{ip}:5000&quot;}
+
+    URL -- No --&gt; FIX_URL[&quot;Use correct URL shown in&lt;br/&gt;CLI status or setup wizard&quot;]
+    URL -- Yes --&gt; BROWSER{&quot;Phone browser issue?&quot;}
+
+    BROWSER -- Yes --&gt; FIX_BROWSER[&quot;Try Chrome/Edge/Safari&lt;br/&gt;Clear cache, disable ad blocker&quot;]
+    BROWSER -- No --&gt; PORT{&quot;Port 5000 in use by another app?&quot;}
+
+    PORT -- Yes --&gt; CHANGE_PORT[&quot;Change port in server.py&lt;br/&gt;or kill conflicting process&quot;]
+    PORT -- No --&gt; UNKNOWN[&quot;Check events.log for errors&quot;]</pre>
+
+<h3>Detailed Solutions</h3>
+
+<h4>Different WiFi Networks</h4>
+
+<p><strong>Symptom:</strong> Browser shows "Site cannot be reached" or timeout.</p>
+
+<p><strong>Fix:</strong></p>
+<ul>
+<li>Ensure phone and laptop are on the <strong>same</strong> network</li>
+<li>Check laptop's IP: <code>ipconfig</code> (Windows) or <code>ip addr</code> (Linux/macOS)</li>
+<li>Use <code>http://<ip>:5000</code> (not <code>https://</code>)</li>
+<li>For remote access, use the Cloudflare tunnel URL</li>
+</ul>
+
+<h4>Firewall Blocking (Windows)</h4>
+
+<p><strong>Check:</strong></p>
+<pre><code>netsh advfirewall firewall show rule name=&quot;Remote Mouse 5000&quot;</code></pre>
+
+<p><strong>Add if missing:</strong></p>
+<pre><code>netsh advfirewall firewall add rule name=&quot;Remote Mouse 5000&quot; dir=in action=allow protocol=TCP localport=5000</code></pre>
+
+<h4>Server Not Running</h4>
+
+<p><strong>Check:</strong></p>
+<ul>
+<li>Terminal should show: <code>OK Remote Mouse v1.0.0 starting on port 5000...</code></li>
+<li>Look for Python traceback errors</li>
+<li>Verify with: <code>python -m py_compile src/server.py</code></li>
+</ul>
+
+<h4>Wrong Port</h4>
+
+<p>If you changed the port in <code>server.py</code>:</p>
+<pre><code>socketio.run(app, host=&#x27;0.0.0.0&#x27;, port=5000, ...)</code></pre>
+<p>Use <code>http://<ip>:<new-port></code> instead of <code>:5000</code>.</p>
+
+<h4>Phone Browser Issues</h4>
+
+<table>
+<tr><th>Action</th><th>Why</th></tr>
+<tr><td>--------</td><td>-----</td></tr>
+<tr><td>Use Chrome, Edge, or Safari (latest)</td><td>Best touch + WebSocket support</td></tr>
+<tr><td>Clear browser cache</td><td>Stale JS may have incompatible socket.io version</td></tr>
+<tr><td>Disable ad blocker</td><td>Some block WebSocket connections</td></tr>
+<tr><td>Disable VPN</td><td>VPN routes traffic away from LAN</td></tr>
+</table>
+
+<hr>
+
+<h2>WebSocket Issues</h2>
+
+<h3>Decision Tree: WebSocket Disconnects Constantly</h3>
+
+<pre class="mermaid">graph TD
+    START{&quot;Status bar shows&lt;br/&gt;&#x27;Reconnecting (n)...&#x27;&quot;} --&gt; WIFI{&quot;WiFi stable?&quot;}
+
+    WIFI -- No --&gt; FIX_WIFI[&quot;Move closer to router&lt;br/&gt;Use 5GHz instead of 2.4GHz&lt;br/&gt;Reduce interference&quot;]
+    WIFI -- Yes --&gt; CONGEST{&quot;Network congestion?&quot;}
+
+    CONGEST -- Yes --&gt; FIX_CONGEST[&quot;Close streaming/downloads&lt;br/&gt;Disconnect unused devices&quot;]
+    CONGEST -- No --&gt; TUNNEL{&quot;Using remote tunnel?&quot;}
+
+    TUNNEL -- Yes --&gt; FIX_TUNNEL[&quot;Free Cloudflare tunnels drop idle&lt;br/&gt;Auto-reconnect recovers in 5s&lt;br/&gt;Restart tunnel if persistent&quot;]
+    TUNNEL -- No --&gt; SLEEP{&quot;Laptop going to sleep?&quot;}
+
+    SLEEP -- Yes --&gt; FIX_SLEEP[&quot;Disable sleep on AC power&lt;br/&gt;Power &amp; Sleep &gt; Never&quot;]
+    SLEEP -- No --&gt; PING{&quot;Ping timeout?&quot;}
+
+    PING --&gt; FIX_PING[&quot;Check ping_interval/ping_timeout&lt;br/&gt;in server.py socketio config&quot;]</pre>
+
+<h3>Detailed Solutions</h3>
+
+<h4>Unstable WiFi</h4>
+<ul>
+<li>Move closer to router</li>
+<li>Switch to 5GHz (less interference than 2.4GHz)</li>
+<li>Remove sources of interference (microwaves, cordless phones)</li>
+</ul>
+
+<h4>Network Congestion</h4>
+<ul>
+<li>Close bandwidth-heavy apps (streaming, video calls, downloads)</li>
+<li>Disconnect other devices from the network temporarily</li>
+</ul>
+
+<h4>Cloudflare Tunnel Timeout</h4>
+<ul>
+<li>Free Cloudflare tunnels may drop idle connections after ~2 hours</li>
+<li>Auto-reconnect recovers within 5 seconds</li>
+<li>To force reconnect: restart cloudflared or server</li>
+</ul>
+
+<h4>Laptop Goes to Sleep</h4>
+<p><strong>Windows:</strong> Settings > System > Power & sleep > Never</p>
+<p><strong>macOS:</strong> System Preferences > Energy Saver > Never</p>
+<p><strong>Linux:</strong> <code>systemctl mask sleep.target</code></p>
+
+<hr>
+
+<h2>Mouse Control Issues</h2>
+
+<h3>Decision Tree: Cursor Does Not Move</h3>
+
+<pre class="mermaid">graph TD
+    START{&quot;Connected status?&lt;br/&gt;(green dot)&quot;} -- No --&gt; CONN[&quot;See Connection Issues above&quot;]
+    START -- Yes --&gt; LOGS{&quot;CLI shows&lt;br/&gt;&gt; move events?&quot;}
+
+    LOGS -- No --&gt; EVENTS[&quot;Events not reaching server&lt;br/&gt;Check WebSocket connection&quot;]
+    LOGS -- Yes --&gt; OS{&quot;OS permissions issue?&quot;}
+
+    OS -- macOS --&gt; PERM_MAC[&quot;Grant Accessibility permission&lt;br/&gt;System Preferences &gt; Privacy&lt;br/&gt;&gt; Accessibility &gt; Terminal&quot;]
+    OS -- Linux --&gt; PERM_LIN[&quot;Install python3-xlib&lt;br/&gt;Switch from Wayland to X11&quot;]
+    OS -- Windows --&gt; MULTI{&quot;Multiple displays?&quot;}
+
+    MULTI -- Yes --&gt; FIX_MULTI[&quot;Cursor may be off-screen&lt;br/&gt;Move back slowly&lt;br/&gt;Verify screen resolution&quot;]
+    MULTI -- No --&gt; PYG[&quot;pyautogui internal error&lt;br/&gt;Check server traceback&quot;]</pre>
+
+<h3>Cursor Moves in Wrong Direction</h3>
+
+<p><strong>Symptom:</strong> Dragging up moves cursor down (or right/left inverted).</p>
+
+<p><strong>Fix:</strong> In <code>frontend/index.html</code>, negate dx or dy in the touchmove handler:</p>
+
+<pre><code>// Invert axes as needed
+socket.emit(&#x27;mouse_move&#x27;, {
+  dx: -dx * sensitivity,  // Invert horizontal
+  dy: dy * sensitivity     // Normal vertical
+});</code></pre>
+
+<h3>Sensitivity Too High or Low</h3>
+
+<table>
+<tr><th>Issue</th><th>Fix</th></tr>
+<tr><td>-------</td><td>-----</td></tr>
+<tr><td>Too fast</td><td>Set sensitivity to 0.5x or 0.2x</td></tr>
+<tr><td>Too slow</td><td>Set sensitivity to 2.0x or 3.0x</td></tr>
+<tr><td>Changes not applied</td><td>Slider adjusts in real-time. Check <code>sens-slider</code> value</td></tr>
+</table>
+
+<p>Adjust via Settings panel (gear icon) → Sensitivity slider.</p>
+
+<h3>Two-Finger Scroll Not Working</h3>
+
+<pre class="mermaid">graph TD
+    START{&quot;Scroll not working&quot;} --&gt; FINGERS{&quot;Using exactly 2 fingers?&quot;}
+
+    FINGERS -- No --&gt; USE_2[&quot;Use two fingers on touchpad&lt;br/&gt;Scroll zone indicator is visual only&quot;]
+    FINGERS -- Yes --&gt; DELTA{&quot;Large enough movement?&quot;}
+
+    DELTA -- No --&gt; MOVE_MORE[&quot;Drag more firmly&lt;br/&gt;Minimum delta: 20px per notch&quot;]
+    DELTA -- Yes --&gt; DIR{&quot;Scroll direction wrong?&quot;}
+
+    DIR -- Yes --&gt; FIX_DIR[&quot;Invert in server.py handle_scroll:&lt;br/&gt;swap sign of pyautogui.scroll()&quot;]
+    DIR -- No --&gt; DEAD{&quot;Client-side dead zone?&quot;}
+
+    DEAD --&gt; FIX_DEAD[&quot;Check touchmove handler for scroll&lt;br/&gt;Ensure no pixel threshold blocks it&quot;]</pre>
+
+<p><strong>Note:</strong> In v5.0.0, two-finger scroll was silently broken due to <code>prev1.y</code> instead of <code>prev1.lastY</code>. Fixed in v5.0.1. If you're on an older version, update your code.</p>
+
+<h3>Drag Mode Issues</h3>
+
+<table>
+<tr><th>Symptom</th><th>Cause</th><th>Fix</th></tr>
+<tr><td>---------</td><td>-------</td><td>-----</td></tr>
+<tr><td>Drag doesn't hold button</td><td>Drag Mode not toggled on</td><td>Tap drag button (center) until green</td></tr>
+<tr><td>Drag moves without clicking</td><td>Drag Mode is on, tap still works</td><td>Tap = click, drag = hold+move</td></tr>
+<tr><td>Drag speed too fast</td><td>1.2x multiplier applies</td><td>Edit multiplier in <code>index.html</code></td></tr>
+</table>
+
+<hr>
+
+<h2>Media Control Issues</h2>
+
+<h3>Decision Tree: Media Buttons Do Nothing</h3>
+
+<pre class="mermaid">graph TD
+    START{&quot;Pressing media buttons&lt;br/&gt;does nothing&quot;} --&gt; LOGS{&quot;CLI shows &#x27;media&#x27; events?&quot;}
+
+    LOGS -- No --&gt; CONN[&quot;Check WebSocket connection&lt;br/&gt;(green dot)&quot;]
+    LOGS -- Yes --&gt; PLAYER{&quot;Media app open and playing?&quot;}
+
+    PLAYER -- No --&gt; OPEN_APP[&quot;Open Spotify/VLC/YouTube first&lt;br/&gt;Media keys need active session&quot;]
+    PLAYER -- Yes --&gt; OS{&quot;OS support for media keys?&quot;}
+
+    OS -- Windows --&gt; WORKS[&quot;Should work natively&quot;]
+    OS -- macOS --&gt; FOCUS[&quot;Some apps need focus&lt;br/&gt;Click app first&quot;]
+    OS -- Linux --&gt; PLAYERCTL[&quot;Install playerctl&lt;br/&gt;or check DE media key support&quot;]</pre>
+
+<h3>Volume Changes Too Large/Small</h3>
+
+<p>Each <code>press('volumeup')</code> sends one key press. Volume change per press:</p>
+<ul>
+<li>Windows: ~2%</li>
+<li>macOS: ~1 notch</li>
+<li>Linux: varies by DE</li>
+</ul>
+
+<p><strong>To send multiple presses per button press,</strong> modify <code>handle_media</code> in <code>src/server.py</code>:</p>
+
+<pre><code>key = key_map.get(action)
+if key:
+    count = 3 if action in (&#x27;vol_up&#x27;, &#x27;vol_down&#x27;) else 1
+    for _ in range(count):
+        pyautogui.press(key, _pause=False)</code></pre>
+
+<hr>
+
+<h2>Email Issues</h2>
+
+<h3>Decision Tree: Email Not Sending</h3>
+
+<pre class="mermaid">graph TD
+    START{&quot;Email send failed&quot;} --&gt; ENV{&quot;.env file exists?&quot;}
+
+    ENV -- No --&gt; CREATE_ENV[&quot;cp .env.example .env&lt;br/&gt;Fill in credentials&quot;]
+    ENV -- Yes --&gt; TEST{&quot;python src/email_service.py --test&lt;br/&gt;works?&quot;}
+
+    TEST -- Yes --&gt; API{&quot;Server /api/send-url failing?&quot;}
+    TEST -- No --&gt; AUTH{&quot;Authentication failed?&quot;}
+
+    AUTH -- Gmail --&gt; APP_PASS[&quot;Use App Password (not regular password)&lt;br/&gt;Enable 2FA → https://myaccount.google.com/apppasswords&quot;]
+    AUTH -- Other --&gt; CHECK_CREDS[&quot;Verify username/password&lt;br/&gt;Remove trailing spaces in .env&quot;]
+    AUTH -- N/A --&gt; PORT{&quot;Port 587 or 465 blocked?&quot;}
+
+    PORT -- Yes --&gt; CHANGE_NET[&quot;Try different network&lt;br/&gt;Corporate/public WiFi blocks SMTP&lt;br/&gt;Use phone hotspot&quot;]
+    PORT -- No --&gt; SPAM{&quot;Check spam folder&quot;}
+
+    SPAM --&gt; DELAY[&quot;Carrier SMS gateways:&lt;br/&gt;30s to 5min delay&lt;br/&gt;Some carriers block unknown senders&quot;]</pre>
+
+<h3>Detailed Solutions</h3>
+
+<h4>Missing .env File</h4>
+
+<pre><code>cp .env.example .env</code></pre>
+
+<p>Edit <code>.env</code> with your SMTP credentials. The file must be at <strong>project root</strong> (<code>PROJECT_ROOT/.env</code>), not in <code>src/</code> or <code>frontend/</code>.</p>
+
+<h4>Gmail App Password Required</h4>
+
+<ol>
+<li>Enable 2-Step Verification at https://myaccount.google.com/security</li>
+<li>Generate App Password at https://myaccount.google.com/apppasswords</li>
+<li>Use the 16-character password (no spaces) in <code>.env</code></li>
+<li>Test: <code>python src/email_service.py --test</code></li>
+</ol>
+
+<h4>Port Blocked</h4>
+
+<p>Corporate networks, public WiFi, and some mobile hotspots block SMTP ports (587, 465). Workaround: use a different network.</p>
+
+<h4>Testing Configuration</h4>
+
+<pre><code># Test with default recipient (SMTP_TO_EMAIL in .env)
+python src/email_service.py --test
+
+# Send a specific URL
+python src/email_service.py --send https://mytunnel.trycloudflare.com</code></pre>
+
+<hr>
+
+<h2>Cloudflare Tunnel Issues</h2>
+
+<h3>Decision Tree: Tunnel Fails to Start</h3>
+
+<pre class="mermaid">graph TD
+    START{&quot;Tunnel URL not appearing&quot;} --&gt; INSTALL{&quot;cloudflared installed?&quot;}
+
+    INSTALL -- No --&gt; DL[&quot;Download from&lt;br/&gt;https://developers.cloudflare.com/cloudflare-one/&lt;br/&gt;connections/connect-networks/downloads/&quot;]
+    INSTALL -- Yes --&gt; SERVER{&quot;Server running on port 5000?&quot;}
+
+    SERVER -- No --&gt; START_SRV[&quot;python src/server.py&quot;]
+    SERVER -- Yes --&gt; NET{&quot;Network allows tunneling?&quot;}
+
+    NET -- No --&gt; CHANGE_NET[&quot;Try different network&lt;br/&gt;Some networks block tunnel tools&quot;]
+    NET -- Yes --&gt; VER{&quot;cloudflared version up to date?&quot;}
+
+    VER -- No --&gt; UPDATE[&quot;cloudflared update&lt;br/&gt;or download latest&quot;]
+    VER -- Yes --&gt; TIMEOUT{&quot;30s timeout?&quot;}
+
+    TIMEOUT --&gt; CHECK_LOG[&quot;Check server output&lt;br/&gt;Look for cloudflared errors&lt;br/&gt;Try running cloudflared manually&quot;]</pre>
+
+<h3>Detailed Solutions</h3>
+
+<h4>cloudflared Not Installed</h4>
+
+<p>Download from: https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/</p>
+
+<p>Verify: <code>cloudflared --version</code></p>
+
+<h4>Port 5000 Not Accessible</h4>
+
+<pre><code># Test server is running
+curl http://localhost:5000
+# Should return HTML content</code></pre>
+
+<h4>cloudflared Not Found by Server</h4>
+
+<p>The server searches for cloudflared in:</p>
+<ol>
+<li>System PATH (<code>cloudflared</code> or <code>cloudflared.exe</code>)</li>
+<li><code>~/.cloudflared/cloudflared.exe</code></li>
+<li><code>C:\Program Files\cloudflared\cloudflared.exe</code></li>
+<li><code>C:\tools\cloudflared\cloudflared.exe</code></li>
+<li><code>/usr/local/bin/cloudflared</code></li>
+<li><code>/usr/bin/cloudflared</code></li>
+</ol>
+
+<p>If installed elsewhere, add its directory to PATH or symlink it into one of these locations.</p>
+
+<h4>Tunnel URL Changes Every Session</h4>
+
+<p>This is expected for free Cloudflare tunnels. The URL changes:</p>
+<ul>
+<li>Every time cloudflared restarts</li>
+<li>After idle timeout (~2 hours)</li>
+</ul>
+
+<p>The frontend auto-refreshes via <code>/api/tunnel-url</code> polling and <code>request_tunnel_url</code> WebSocket event.</p>
+
+<hr>
+
+<h2>CLI Issues</h2>
+
+<h3>Decision Tree: CLI Won't Start or Crashes</h3>
+
+<pre class="mermaid">graph TD
+    START{&quot;CLI won&#x27;t start&quot;} --&gt; PYTHON{&quot;python --version works?&quot;}
+
+    PYTHON -- No --&gt; ADD_PATH[&quot;Add Python to PATH&lt;br/&gt;Re-run installer, check &#x27;Add to PATH&#x27;&quot;]
+    PYTHON -- Yes --&gt; DEPS{&quot;pip install -r requirements.txt&lt;br/&gt;succeeds?&quot;}
+
+    DEPS -- No --&gt; INSTALL_DEPS[&quot;Install dependencies&lt;br/&gt;pip install flask flask-socketio pyautogui eventlet colorama&quot;]
+    DEPS -- Yes --&gt; PORT{&quot;Port 5000 in use?&quot;}
+
+    PORT -- Yes --&gt; KILL[&quot;netstat -ano | findstr :5000&lt;br/&gt;taskkill /PID &lt;pid&gt; /F&quot;]
+    PORT -- No --&gt; SYNTAX{&quot;python -m py_compile src/server.py&lt;br/&gt;succeeds?&quot;}
+
+    SYNTAX -- No --&gt; FIX[&quot;Fix syntax errors in server.py&quot;]
+    SYNTAX -- Yes --&gt; UNKNOWN[&quot;Check full traceback&lt;br/&gt;Report issue&quot;]</pre>
+
+<h3>Detailed Solutions</h3>
+
+<h4>"Python not found"</h4>
+
+<p>Add Python to PATH:</p>
+<ul>
+<li><strong>Windows:</strong> Re-run Python installer, check "Add Python to PATH"</li>
+<li><strong>macOS/Linux:</strong> Python is usually pre-installed. Try <code>python3</code> instead of <code>python</code></li>
+</ul>
+
+<h4>"Server stopped" Immediately</h4>
+
+<p><strong>Port 5000 already in use:</strong></p>
+<pre><code># Find process using port 5000
+netstat -ano | findstr :5000
+
+# Kill it
+taskkill /PID &lt;pid&gt; /F</code></pre>
+
+<p><strong>Missing dependencies:</strong></p>
+<pre><code>pip install -r requirements.txt</code></pre>
+
+<p><strong>Syntax error:</strong></p>
+<pre><code>python -m py_compile src/server.py</code></pre>
+
+<h4>CLI Output Garbled or Missing Colors</h4>
+
+<pre><code>pip install colorama</code></pre>
+
+<p>Colorama is optional on Windows 10+ terminal but required for colored output on older Windows and Linux/macOS.</p>
+
+<hr>
+
+<h2>Performance Issues</h2>
+
+<h3>High Latency</h3>
+
+<p><strong>Symptom:</strong> Noticeable delay between touch and cursor movement.</p>
+
+<table>
+<tr><th>Cause</th><th>Latency</th><th>Fix</th></tr>
+<tr><td>-------</td><td>---------</td><td>-----</td></tr>
+<tr><td>Different networks</td><td>∞</td><td>Move to same WiFi</td></tr>
+<tr><td>2.4GHz WiFi</td><td>10–30ms extra</td><td>Switch to 5GHz</td></tr>
+<tr><td>Network congestion</td><td>50–200ms extra</td><td>Close streaming/downloads</td></tr>
+<tr><td>Cloudflare tunnel</td><td>50–200ms extra</td><td>Use local access when possible</td></tr>
+<tr><td>High sensitivity</td><td>Perceived delay</td><td>Lower sensitivity (0.5x–1.0x)</td></tr>
+</table>
+
+<h3>Cursor Jitter</h3>
+
+<p><strong>Symptom:</strong> Cursor vibrates when finger is still.</p>
+
+<p><strong>Fixes (in order of effectiveness):</strong></p>
+
+<ol>
+<li><strong>Increase dead zone in <code>index.html</code>:</strong></li>
+</ol>
+<pre><code>   // Change from &gt; 1 to &gt; 3
+   if (Math.abs(dx) &gt; 3 || Math.abs(dy) &gt; 3) {</code></pre>
+
+<ol>
+<li><strong>Lower sensitivity:</strong> Reduces amplification of micro-movements</li>
+</ol>
+
+<ol>
+<li><strong>Clean phone screen:</strong> Oil, moisture, or screen protector can cause erratic touch readings</li>
+</ol>
+
+<hr>
+
+<h2>Platform-Specific Issues</h2>
+
+<h3>macOS: pyautogui Not Working</h3>
+
+<p><strong>Step-by-step fix:</strong></p>
+<ol>
+<li>System Settings > Privacy & Security > Accessibility</li>
+<li>Click lock icon and enter password</li>
+<li>Click + and add your terminal app (Terminal.app or iTerm2)</li>
+<li>Also add <code>Python.app</code> if visible</li>
+<li>Restart the server</li>
+<li>Test again</li>
+</ol>
+
+<h3>Linux: Wayland vs X11</h3>
+
+<p>pyautogui requires X11. If using Wayland (default on Ubuntu 21.04+, Fedora 34+):</p>
+
+<p><strong>Option 1:</strong> Switch to X11 on login screen (gear icon before entering password)</p>
+
+<p><strong>Option 2:</strong> Use xdotool as alternative in <code>server.py</code>:</p>
+<pre><code>import subprocess
+subprocess.run([&#x27;xdotool&#x27;, &#x27;mousemove_relative&#x27;, &#x27;--&#x27;, str(dx), str(dy)])</code></pre>
+
+<p><strong>Option 3:</strong> Install <code>python3-xlib</code> for partial Wayland support.</p>
+
+<h3>Windows: Antivirus Blocking</h3>
+
+<p>Add exceptions for:</p>
+<ul>
+<li><code>python.exe</code> (or <code>python3.exe</code>)</li>
+<li>Port 5000 (TCP inbound/outbound)</li>
+</ul>
+
+<p>Common antivirus software that may interfere: Norton, McAfee, Avast, Bitdefender.</p>
+
+<h3>Phone Browser Compatibility</h3>
+
+<table>
+<tr><th>Browser</th><th>WebSocket</th><th>Haptic</th><th>Clipboard</th><th>Status</th></tr>
+<tr><td>---------</td><td>-----------</td><td>--------</td><td>-----------</td><td>--------</td></tr>
+<tr><td>Chrome (Android)</td><td>✅</td><td>✅</td><td>✅</td><td>Best experience</td></tr>
+<tr><td>Edge (Android)</td><td>✅</td><td>✅</td><td>✅</td><td>Same engine as Chrome</td></tr>
+<tr><td>Samsung Internet</td><td>✅</td><td>✅</td><td>✅</td><td>Minor CSS differences</td></tr>
+<tr><td>Safari (iOS)</td><td>✅</td><td>❌</td><td>⚠️ HTTPS only</td><td>No vibration API on iOS</td></tr>
+<tr><td>Firefox (Android)</td><td>✅</td><td>✅</td><td>✅</td><td>Slightly different touch behavior</td></tr>
+</table>
+
+<p><strong>iOS limitations:</strong></p>
+<ul>
+<li><code>navigator.vibrate()</code> not supported (all iOS browsers use WebKit, no Vibration API)</li>
+<li>Clipboard API requires HTTPS (local HTTP may not work)</li>
+</ul>
+
+<hr>
+
+<h2>Error Messages Reference</h2>
+
+<table>
+<tr><th>Error Message</th><th>Meaning</th><th>Fix</th></tr>
+<tr><td>---------------</td><td>---------</td><td>-----</td></tr>
+<tr><td><code>[Errno 10048] Address already in use</code></td><td>Port 5000 already used</td><td>Kill process or change port</td></tr>
+<tr><td><code>pyautogui.PyAutoGUIException</code></td><td>pyautogui operation failed</td><td>Grant macOS permissions / check OS</td></tr>
+<tr><td><code>smtplib.SMTPAuthenticationError</code></td><td>SMTP login failed</td><td>Check username and password</td></tr>
+<tr><td><code>smtplib.SMTPServerDisconnected</code></td><td>SMTP server closed connection</td><td>Check SMTP host and port</td></tr>
+<tr><td><code>socket.gaierror</code></td><td>DNS resolution failed</td><td>Check network connectivity</td></tr>
+<tr><td><code>OSError: [WinError 10061]</code></td><td>Connection refused</td><td>Server not running on that port</td></tr>
+<tr><td><code>FileNotFoundError: cloudflared</code></td><td>cloudflared not in PATH</td><td>Install and add to PATH</td></tr>
+<tr><td><code>TimeoutExpired</code></td><td>cloudflared took >30s</td><td>Check network / try manually</td></tr>
+<tr><td><code>ModuleNotFoundError: eventlet</code></td><td>Missing dependency</td><td><code>pip install eventlet</code></td></tr>
+</table>
+
+<hr>
+
+<h2>Log File Analysis</h2>
+
+<p>Check <code>PROJECT_ROOT/events.log</code> for patterns:</p>
+
+<pre><code># Normal operation
+[19:30:22] OK Remote Mouse v1.0.0 starting on port 5000...
+[19:31:05] OK Client connected
+[19:31:12] INFO move   (+0045, -0023)
+
+# Common errors
+[19:32:00] ERROR Failed to send email: SMTPAuthenticationError
+[19:33:00] ERROR cloudflared timed out (30s)
+[19:34:00] WARN Client disconnected (likely network issue)</code></pre>
+
+<hr>
+
+<h2>Version-Specific Issues</h2>
+
+<h3>v1.0.0 — DPI Presets</h3>
+
+<table>
+<tr><th>Issue</th><th>Cause</th><th>Fix</th></tr>
+<tr><td>-------</td><td>-------</td><td>-----</td></tr>
+<tr><td>DPI buttons don't respond</td><td>JS event not bound</td><td>Check <code>index.html</code> for <code>click</code> handlers on preset buttons</td></tr>
+<tr><td>DPI setting not saved</td><td>Session-only storage</td><td>Profile persistence not yet implemented (planned for v1.0.4)</td></tr>
+<tr><td>Effective DPI shows wrong value</td><td>Base DPI calculation mismatch</td><td>Check <code>base_dpi</code> constant in <code>src/server.py</code></td></tr>
+</table>
+
+<h3>v5.0.1 — Two-Finger Scroll Fix</h3>
+
+<p>If updating from v5.0.0: two-finger scroll was broken due to <code>prev1.y</code> instead of <code>prev1.lastY</code>. All touch objects were also simplified (removed orphan <code>startX</code>/<code>startY</code>/<code>startTime</code>). Ensure you have the latest version of <code>frontend/index.html</code>.</p>
+
+</main>
+</body>
+</html>

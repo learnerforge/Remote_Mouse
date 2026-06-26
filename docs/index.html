@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Home — Remote Mouse Docs</title>
+<link rel="stylesheet" href="../css/style.css">
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({startOnLoad:true,theme:'dark',fontSize:13})</script>
+</head>
+<body>
+<nav>
+<h2>Remote Mouse</h2>
+<ul><li><a href="index.html" class="active">Home</a></li>
+<li><a href="architecture.html">Architecture</a></li>
+<li><a href="configuration.html">Configuration</a></li>
+<li><a href="protocol.html">Protocol</a></li>
+<li><a href="troubleshooting.html">Troubleshooting</a></li>
+<li><a href="comparison.html">Comparison</a></li></ul>
+<div class="section-title">Reference</div>
+<ul>
+<li><a href="index.html" class="active">Home</a></li>
+<li><a href="architecture.html">Architecture</a></li>
+<li><a href="configuration.html">Configuration</a></li>
+<li><a href="protocol.html">Protocol</a></li>
+<li><a href="troubleshooting.html">Troubleshooting</a></li>
+<li><a href="comparison.html">Comparison</a></li>
+</ul>
+</nav>
+<main>
+<h1>Remote Mouse — Full Reference</h1>
+
+<p><strong>Author:</strong> learnerforge  </p>
+<p><strong>Version:</strong> v1.0.0  </p>
+<p><strong>License:</strong> MIT</p>
+
+<p>This document is the detailed version of the README. It contains the full Mermaid diagrams, use cases, performance reference, and documentation index that the concise README omits.</p>
+
+<hr>
+
+<h2>Overview</h2>
+
+<p>Remote Mouse is a client-server application that lets you control your laptop's mouse cursor and media playback from any phone or tablet with a modern browser. The laptop runs a Python server (Flask + Socket.IO) that receives touch events over WebSocket and translates them into OS-level mouse actions via <code>pyautogui</code>.</p>
+
+<h3>How It Works</h3>
+
+<pre class="mermaid">graph LR
+    subgraph Phone[&quot;Phone (Browser)&quot;]
+        URL[&quot;Open URL from email&lt;br/&gt;or local network&quot;]
+        PAGE[&quot;index.html loads&lt;br/&gt;in browser&quot;]
+        SOCKET[&quot;WebSocket connects&lt;br/&gt;to laptop&quot;]
+        TOUCH[&quot;Touch events sent&lt;br/&gt;mouse_move, click, scroll&quot;]
+    end
+
+    subgraph Network[&quot;Network&quot;]
+        LOCAL[&quot;Same WiFi&lt;br/&gt;http://{ip}:5000&quot;]
+        TUNNEL[&quot;Cloudflare Tunnel&lt;br/&gt;https://*.trycloudflare.com&quot;]
+    end
+
+    subgraph Laptop[&quot;Laptop (Server)&quot;]
+        FLASK[&quot;Python Server&lt;br/&gt;Flask + Socket.IO&quot;]
+        PYG[&quot;pyautogui&lt;br/&gt;mouse.moveRel, .click, .scroll&quot;]
+        CMD[&quot;OS Control&lt;br/&gt;Media keys, keyboard shortcuts&quot;]
+    end
+
+    URL --&gt; PAGE --&gt; SOCKET --&gt; TOUCH
+    TOUCH --&gt; LOCAL
+    TOUCH --&gt; TUNNEL
+    LOCAL --&gt; FLASK
+    TUNNEL --&gt; FLASK
+    FLASK --&gt; PYG --&gt; CMD</pre>
+
+<h3>Data Flow</h3>
+
+<pre class="mermaid">sequenceDiagram
+    participant Phone as Phone Browser
+    participant Flask as Flask HTTP
+    participant WS as Flask-SocketIO
+    participant PYG as pyautogui
+    participant OS as Operating System
+
+    Phone-&gt;&gt;Flask: GET / (index.html)
+    Flask--&gt;&gt;Phone: HTML + inline CSS/JS
+    Phone-&gt;&gt;Flask: GET /static/socket.io.min.js
+    Flask--&gt;&gt;Phone: 49KB lib (cached 24h)
+
+    Note over Phone,WS: WebSocket connects
+    WS--&gt;&gt;Phone: screen_info {width, height, ip, tunnel_url}
+
+    Note over Phone,OS: User drags finger
+    Phone-&gt;&gt;WS: mouse_move {dx: 45, dy: -23}
+    WS-&gt;&gt;PYG: moveRel(45, -23)
+    PYG-&gt;&gt;OS: SetCursorPos(x+45, y-23)
+
+    Note over Phone,OS: User taps
+    Phone-&gt;&gt;WS: click {button: &quot;left&quot;}
+    WS-&gt;&gt;PYG: click(button=&#x27;left&#x27;)
+    PYG-&gt;&gt;OS: mouse_event(LEFT_DOWN)
+    PYG-&gt;&gt;OS: mouse_event(LEFT_UP)
+
+    Note over Phone,OS: User two-finger scrolls
+    Phone-&gt;&gt;WS: scroll {dy: 120}
+    WS-&gt;&gt;PYG: scroll(-6)
+    PYG-&gt;&gt;OS: mouse_event(WHEEL, -6)
+
+    Note over Phone,OS: User presses Play
+    Phone-&gt;&gt;WS: media {action: &quot;play_pause&quot;}
+    WS-&gt;&gt;PYG: press(&#x27;playpause&#x27;)
+    PYG-&gt;&gt;OS: SendInput(KEY, MEDIA_PLAY_PAUSE)</pre>
+
+<hr>
+
+<h2>Features</h2>
+
+<pre class="mermaid">mindmap
+  root((Remote Mouse))
+    Touch Control
+      One-finger move
+      Tap to click
+      Two-finger scroll
+      Drag mode
+    Click Bar
+      Left click
+      Right click
+      DPI presets 400/800/1600/3200
+    Media Remote
+      Play / Pause
+      Next / Previous track
+      Volume up / down
+      Mute
+    Connection
+      Same WiFi (LAN)
+      Cloudflare tunnel (remote)
+      Localhost (same machine)
+      Auto-reconnect
+    Setup Wizard
+      3 connection cases
+      Email delivery
+      Live log output
+      Auto-redirect
+    Server Management
+      REPL control panel
+      Colorized live logs
+      Event history
+      One-command startup
+    Configuration
+      Sensitivity 0.2x–3.0x
+      DPI presets
+      SMTP email
+      Custom port</pre>
+
+<table>
+<tr><th>Feature</th><th>What it does</th></tr>
+<tr><td>---------</td><td>-------------</td></tr>
+<tr><td><strong>Touchpad</strong></td><td>Touch and drag to move cursor. Tap to click. Two-finger scroll.</td></tr>
+<tr><td><strong>Left/Right Click</strong></td><td>Dedicated buttons at the bottom for precise clicks.</td></tr>
+<tr><td><strong>Drag Mode</strong></td><td>Hold left button while dragging for selections, moving windows.</td></tr>
+<tr><td><strong>Media Controls</strong></td><td>Play/Pause, Next/Previous, Volume up/down/mute.</td></tr>
+<tr><td><strong>DPI Presets</strong></td><td>400/800/1600/3200 DPI buttons with real-time switching.</td></tr>
+<tr><td><strong>Sensitivity</strong></td><td>Adjustable speed slider (0.2x to 3.0x).</td></tr>
+<tr><td><strong>Tunnel URL delivery</strong></td><td>Auto-emails Cloudflare URL to your phone.</td></tr>
+<tr><td><strong>Local fallback</strong></td><td>If cloudflared missing, use local network IP directly.</td></tr>
+<tr><td><strong>Zero phone setup</strong></td><td>No app store, no installation, no permissions. Just a browser.</td></tr>
+<tr><td><strong>Auto-reconnect</strong></td><td>WebSocket reconnects with exponential backoff (1s → 5s max).</td></tr>
+<tr><td><strong>Live action log</strong></td><td>All events printed to terminal with colorized output.</td></tr>
+<tr><td><strong>Setup wizard</strong></td><td>3-step <code>/setup</code> page: pick case → email → watch logs → go.</td></tr>
+<tr><td><strong>REPL control panel</strong></td><td>Interactive terminal with <code>status</code>, <code>log</code>, <code>clear</code>, <code>help</code>.</td></tr>
+<tr><td><strong>Local socket.io</strong></td><td>49KB library served from laptop — no CDN, no 3-minute load.</td></tr>
+</table>
+
+<hr>
+
+<h2>Use Cases</h2>
+
+<table>
+<tr><th>Scenario</th><th>Why Remote Mouse</th></tr>
+<tr><td>----------</td><td>-----------------</td></tr>
+<tr><td><strong>Presentations</strong></td><td>Control slides from across the room. No clicker needed.</td></tr>
+<tr><td><strong>Media PC</strong></td><td>Laptop plugged into TV. Phone becomes media remote.</td></tr>
+<tr><td><strong>Couch browsing</strong></td><td>Navigate laptop from the sofa without getting up.</td></tr>
+<tr><td><strong>Smart TV / Projector</strong></td><td>Laptop as media source, phone as control surface.</td></tr>
+<tr><td><strong>Accessibility</strong></td><td>Touch gestures as alternative to physical mouse.</td></tr>
+<tr><td><strong>Temporary replacement</strong></td><td>Left your mouse at home? Your phone works.</td></tr>
+<tr><td><strong>Remote support</strong></td><td>Control your laptop from another location via tunnel.</td></tr>
+</table>
+
+<hr>
+
+<h2>Tech Stack</h2>
+
+<ul>
+<li>Language: Python 3.10+, JavaScript (vanilla)</li>
+<li>Framework: Flask, Flask-SocketIO</li>
+<li>Database: None (file-based event logging)</li>
+<li>Other Tools: cloudflared, pyautogui, eventlet, colorama, smtplib</li>
+</ul>
+
+<hr>
+
+<h2>Installation</h2>
+
+<pre><code># Clone the repository
+git clone https://github.com/learnerforge/Remote_Mouse.git
+
+# Go to project folder
+cd Remote_Mouse
+
+# Install dependencies
+pip install -r requirements.txt
+
+# (Optional) Configure SMTP email
+cp .env.example .env</code></pre>
+
+<p>Edit <code>.env</code> with your SMTP credentials. For Gmail you need an App Password (enable 2FA → https://myaccount.google.com/apppasswords). See <code>docs/CONFIGURATION.md</code> for provider examples.</p>
+
+<hr>
+
+<h2>Usage</h2>
+
+<pre><code># Start with REPL control panel (recommended)
+python src/cli.py
+
+# Or start the server directly
+python src/server.py</code></pre>
+
+<p>Open the setup wizard at <code>http://localhost:5000/setup</code> on your laptop to pick your connection type. Then open the provided URL on your phone.</p>
+
+<h3>Connection Decision Tree</h3>
+
+<pre class="mermaid">graph TD
+    START[&quot;Open /setup on browser&quot;] --&gt; CASE{&quot;Choose connection type&quot;}
+    CASE --&gt; LOCAL[&quot;Localhost&lt;br/&gt;Open http://127.0.0.1:5000&lt;br/&gt;on same machine&quot;]
+    CASE --&gt; WIFI[&quot;Same WiFi&lt;br/&gt;Open http://{ip}:5000&lt;br/&gt;on phone&quot;]
+    CASE --&gt; REMOTE[&quot;Remote&lt;br/&gt;cloudflared starts →&lt;br/&gt;URL emailed to phone&quot;]
+
+    WIFI --&gt; CHECK_FW{&quot;Firewall port 5000?&quot;}
+    CHECK_FW -- Blocked --&gt; ADD_RULE[&quot;Add Windows Firewall rule&quot;]
+    CHECK_FW -- Open --&gt; PHONE[&quot;Phone opens URL&quot;]
+    LOCAL --&gt; PHONE2[&quot;Browser loads page&quot;]
+    REMOTE --&gt; EMAIL[&quot;Check email for tunnel URL&quot;]
+    EMAIL --&gt; PHONE3[&quot;Tap link → page loads&quot;]
+
+    PHONE --&gt; READY[&quot;Ready! Start controlling&quot;]
+    PHONE2 --&gt; READY
+    PHONE3 --&gt; READY</pre>
+
+<h3>Manual URL Options</h3>
+
+<ul>
+<li><strong>Same WiFi:</strong> <code>http://{laptop-ip}:5000</code> (find IP with <code>ipconfig</code> on Windows, <code>ip addr</code> on Linux/macOS)</li>
+<li><strong>Remote:</strong> Copy the <code>https://*.trycloudflare.com</code> URL from the CLI output</li>
+<li><strong>Localhost:</strong> <code>http://127.0.0.1:5000</code> (same machine)</li>
+</ul>
+
+<hr>
+
+<h2>Performance</h2>
+
+<table>
+<tr><th>Scenario</th><th>Latency</th><th>Notes</th></tr>
+<tr><td>----------</td><td>---------</td><td>-------</td></tr>
+<tr><td><strong>Same WiFi (local)</strong></td><td>~5–15 ms</td><td>Best experience. Both devices on same network.</td></tr>
+<tr><td><strong>Cloudflare tunnel</strong></td><td>~50–200 ms</td><td>Depends on internet speed and distance to Cloudflare edge.</td></tr>
+<tr><td><strong>Phone hotspot</strong></td><td>~30–100 ms</td><td>Phone connects to laptop's hotspot. No external network needed.</td></tr>
+<tr><td><strong>Different continents</strong></td><td>~200–500 ms</td><td>Tunnel works globally but latency adds up.</td></tr>
+</table>
+
+<h3>Why it's fast</h3>
+
+<ul>
+<li><strong>Local socket.io (49 KB):</strong> Served from laptop's <code>/static/</code>. No CDN download over metered connection — saves 3+ minutes on first load.</li>
+<li><strong>WebSocket-first transport:</strong> Instant bidirectional communication. Falls back to HTTP long-polling only if WebSocket is blocked.</li>
+<li><strong>pyautogui.PAUSE = 0:</strong> Removes pyautogui's built-in 100ms delay between calls.</li>
+<li><strong>Client-side sensitivity scaling:</strong> Delta values are pre-scaled on the phone — server only does <code>moveRel()</code>.</li>
+<li><strong>Dead zone filtering:</strong> Movements under 1px are discarded before sending.</li>
+</ul>
+
+<hr>
+
+<h2>Keyboard Shortcuts (Available via Protocol)</h2>
+
+<p>These key combos are supported server-side and can be added to the frontend:</p>
+
+<table>
+<tr><th>Action</th><th>Keys</th><th>pyautogui call</th></tr>
+<tr><td>--------</td><td>------</td><td>----------------</td></tr>
+<tr><td>Switch apps</td><td><code>Alt+Tab</code></td><td><code>hotkey('alt', 'tab')</code></td></tr>
+<tr><td>Show desktop</td><td><code>Win+D</code></td><td><code>hotkey('win', 'd')</code></td></tr>
+<tr><td>Task view</td><td><code>Win+Tab</code></td><td><code>hotkey('win', 'tab')</code></td></tr>
+<tr><td>Lock screen</td><td><code>Win+L</code></td><td><code>hotkey('win', 'l')</code></td></tr>
+<tr><td>Cancel</td><td><code>Escape</code></td><td><code>press('esc')</code></td></tr>
+<tr><td>Confirm</td><td><code>Enter</code></td><td><code>press('enter')</code></td></tr>
+<tr><td>Activate</td><td><code>Space</code></td><td><code>press('space')</code></td></tr>
+</table>
+
+<hr>
+
+<h2>Project Structure</h2>
+
+<pre><code>Remote_Mouse/
+│── src/                 # Python source (server, cli, email_service)
+│── frontend/            # Web frontend (index.html, setup.html, static/)
+│── docs/                # Reference documentation with Mermaid diagrams
+│── scripts/             # Legacy launcher scripts
+│── README.md
+│── requirements.txt
+│── .env.example</code></pre>
+
+<h3>File Details</h3>
+
+<table>
+<tr><th>Path</th><th>Purpose</th></tr>
+<tr><td>------</td><td>---------</td></tr>
+<tr><td><code>src/server.py</code></td><td>Flask + Flask-SocketIO + pyautogui + cloudflared + setup API</td></tr>
+<tr><td><code>src/cli.py</code></td><td>REPL control panel, subprocess manager, live logs</td></tr>
+<tr><td><code>src/email_service.py</code></td><td>SMTP sender (importable + CLI modes)</td></tr>
+<tr><td><code>frontend/index.html</code></td><td>Main mouse control page (touchpad, media, link)</td></tr>
+<tr><td><code>frontend/setup.html</code></td><td>3-step setup wizard</td></tr>
+<tr><td><code>frontend/static/socket.io.min.js</code></td><td>Socket.IO v4.7.5 (49 KB)</td></tr>
+<tr><td><code>docs/ARCHITECTURE.md</code></td><td>System architecture with Mermaid diagrams</td></tr>
+<tr><td><code>docs/CONFIGURATION.md</code></td><td>Configuration reference with Mermaid diagrams</td></tr>
+<tr><td><code>docs/PROTOCOL.md</code></td><td>WebSocket protocol with sequence diagrams</td></tr>
+<tr><td><code>docs/TROUBLESHOOTING.md</code></td><td>Issue resolution with decision trees</td></tr>
+<tr><td><code>docs/COMPARISON.md</code></td><td>Wired mouse vs Remote Mouse spec comparison</td></tr>
+</table>
+
+<hr>
+
+<h2>Common Commands</h2>
+
+<pre><code># Verify code compiles
+python -m py_compile src/server.py
+python -m py_compile src/cli.py
+python -m py_compile src/email_service.py
+
+# Test email config
+python src/email_service.py --test
+
+# Send a specific URL via email
+python src/email_service.py --send https://tunnel.trycloudflare.com
+
+# Check port usage (Windows)
+netstat -ano | findstr :5000</code></pre>
+
+<hr>
+
+<h2>Future Improvements</h2>
+
+<ul>
+<li>Add middle click and back/forward navigation buttons</li>
+<li>Implement acceleration curves, flick scroll, and momentum</li>
+<li>Add polling rate control and real-time rate monitoring</li>
+<li>Support Bluetooth and LAN discovery for zero-config connection</li>
+<li>Add remappable buttons, macro editor, and onboard profile storage</li>
+<li>Develop ergonomic UI themes, palm rejection, and grip calibration</li>
+</ul>
+
+<hr>
+
+<h2>Version History</h2>
+
+<table>
+<tr><th>Version</th><th>Date</th><th>Changes</th></tr>
+<tr><td>---------</td><td>------</td><td>---------</td></tr>
+<tr><td>v5.0.1</td><td>2026-06</td><td>Two-finger scroll fix, orphan code cleanup, project restructuring</td></tr>
+<tr><td>v5.0.0</td><td>2026-06</td><td>Initial full release, all core features</td></tr>
+<tr><td>v1.0.0</td><td>Current</td><td>DPI presets added (400/800/1600/3200)</td></tr>
+<tr><td>Planned</td><td>Future</td><td>120 versions across 30 specs — see <code>docs/COMPARISON.md</code></td></tr>
+</table>
+
+<hr>
+
+<h2>Documentation Index</h2>
+
+<table>
+<tr><th>File</th><th>What it covers</th></tr>
+<tr><td>------</td><td>----------------</td></tr>
+<tr><td><code>docs/ARCHITECTURE.md</code></td><td>System architecture, component diagrams, data flow, threading model</td></tr>
+<tr><td><code>docs/CONFIGURATION.md</code></td><td>All config options: .env, server settings, frontend tunables, file paths</td></tr>
+<tr><td><code>docs/PROTOCOL.md</code></td><td>WebSocket event reference, REST API, sequence diagrams</td></tr>
+<tr><td><code>docs/TROUBLESHOOTING.md</code></td><td>Decision trees for connection, mouse, media, email, tunnel, CLI issues</td></tr>
+<tr><td><code>docs/COMPARISON.md</code></td><td>30-spec comparison vs wired mouse with scores and Mermaid charts</td></tr>
+</table>
+
+<hr>
+
+<h2>Contributing</h2>
+
+<p>This project is designed to be minimal and self-contained. The frontend is a single HTML file with no build tools. The backend is three Python files with no database, no authentication, and no external services except cloudflared and SMTP.</p>
+
+<p>If you want to add features, start by reading <code>docs/ARCHITECTURE.md</code> to understand the data flow, then look at the WebSocket protocol in <code>docs/PROTOCOL.md</code>.</p>
+
+<hr>
+
+<h2>License</h2>
+
+<p>This project is licensed under the MIT License.</p>
+
+<hr>
+
+<h2>Author</h2>
+
+<p><strong>learnerforge</strong></p>
+
+<p>GitHub: https://github.com/learnerforge</p>
+
+</main>
+</body>
+</html>

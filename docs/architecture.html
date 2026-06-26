@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Architecture — Remote Mouse Docs</title>
+<link rel="stylesheet" href="../css/style.css">
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({startOnLoad:true,theme:'dark',fontSize:13})</script>
+</head>
+<body>
+<nav>
+<h2>Remote Mouse</h2>
+<ul><li><a href="index.html">Home</a></li>
+<li><a href="architecture.html" class="active">Architecture</a></li>
+<li><a href="configuration.html">Configuration</a></li>
+<li><a href="protocol.html">Protocol</a></li>
+<li><a href="troubleshooting.html">Troubleshooting</a></li>
+<li><a href="comparison.html">Comparison</a></li></ul>
+<div class="section-title">Reference</div>
+<ul>
+<li><a href="index.html">Home</a></li>
+<li><a href="architecture.html" class="active">Architecture</a></li>
+<li><a href="configuration.html">Configuration</a></li>
+<li><a href="protocol.html">Protocol</a></li>
+<li><a href="troubleshooting.html">Troubleshooting</a></li>
+<li><a href="comparison.html">Comparison</a></li>
+</ul>
+</nav>
+<main>
+<h1>Architecture</h1>
+
+<p><strong>Version:</strong> v1.0.0  </p>
+<p><strong>Last updated:</strong> 2026-06-26</p>
+
+<p>This document describes the system architecture of Remote Mouse — how components fit together, data flow, and design decisions for the current version.</p>
+
+<hr>
+
+<h2>System Overview</h2>
+
+<p>Remote Mouse follows a simple client-server architecture. The Python server runs on the laptop and serves a web page. The phone connects over WebSocket and sends touch events. The server translates those into OS-level mouse and keyboard actions via <code>pyautogui</code>.</p>
+
+<p>There is no database, no persistent storage (beyond <code>events.log</code> and <code>.tunnel_url</code>), and no authentication. The design prioritizes zero phone installation and minimal latency.</p>
+
+<h3>Project Structure</h3>
+
+<pre><code>Remote_Mouse/
+  src/                  Python source
+    server.py             Flask + Flask-SocketIO + pyautogui + cloudflared + setup API
+    cli.py                REPL control panel, subprocess manager, live logs
+    email_service.py      SMTP sender, importable + CLI modes
+  frontend/             Web frontend
+    index.html            Main mouse control (touchpad, buttons, media, link)
+    setup.html            3-step wizard (connection, email, live logs, redirect)
+    static/
+      socket.io.min.js    Socket.IO v4.7.5 (49 KB, served locally)
+  docs/                 Documentation
+    ARCHITECTURE.md
+    CONFIGURATION.md
+    PROTOCOL.md
+    TROUBLESHOOTING.md
+    COMPARISON.md
+  .env.example          SMTP config template
+  events.log            Runtime event log (gitignored)
+  .tunnel_url           Cloudflare tunnel URL (gitignored)
+  AGENTS.md             LLM agent conventions</code></pre>
+
+<hr>
+
+<h2>High-Level Architecture</h2>
+
+<pre class="mermaid">graph TB
+    subgraph Phone[&quot;Phone Browser&quot;]
+        HTML[&quot;index.html&lt;br/&gt;HTML + CSS + JS&quot;]
+        SIO[&quot;Socket.IO Client&lt;br/&gt;socket.io.min.js&quot;]
+        EVT[&quot;Touch Events&lt;br/&gt;touchstart/move/end&quot;]
+        UI[&quot;UI Pages&lt;br/&gt;Touchpad | Media | Link&quot;]
+        HTML --&gt; SIO
+        EVT --&gt; SIO
+        UI --&gt; EVT
+    end
+
+    subgraph Laptop[&quot;Laptop (Server)&quot;]
+        subgraph Python[&quot;Python Server&quot;]
+            FLASK[&quot;Flask HTTP&lt;br/&gt;Port 5000&quot;]
+            WS[&quot;Flask-SocketIO&lt;br/&gt;WebSocket&quot;]
+            API[&quot;REST API&lt;br/&gt;/api/*&quot;]
+            PYG[&quot;pyautogui&lt;br/&gt;OS Control&quot;]
+            LOG[&quot;Logger&lt;br/&gt;stdout + events.log&quot;]
+            FLASK --&gt; WS
+            FLASK --&gt; API
+            WS --&gt; PYG
+            PYG --&gt; LOG
+        end
+        subgraph Tunnel[&quot;Optional Tunnel&quot;]
+            CF[&quot;cloudflared&lt;br/&gt;trycloudflare.com&quot;]
+        end
+        subgraph CLI[&quot;CLI Control Panel&quot;]
+            REPL[&quot;REPL Loop&lt;br/&gt;commands: status/log/clear&quot;]
+            READER[&quot;stdout Reader&lt;br/&gt;colorized output&quot;]
+        end
+        Python --&gt; CF
+        Python --&gt; CLI
+    end
+
+    SIO -- &quot;WebSocket Events&lt;br/&gt;mouse_move, click, scroll, media&quot; --&gt; WS
+    Phone -- &quot;HTTP GET&lt;br/&gt;index.html, setup.html&quot; --&gt; FLASK
+    CF -- &quot;HTTPS Tunnel&lt;br/&gt;*.trycloudflare.com&quot; --&gt; Phone</pre>
+
+<hr>
+
+<h2>Component Breakdown</h2>
+
+<h3>1. Frontend (<code>frontend/index.html</code>)</h3>
+
+<p>Single HTML file containing all UI markup, inline CSS, and client-side JavaScript. No build step, no external runtime dependencies except the local Socket.IO library.</p>
+
+<h4>Pages</h4>
+
+<pre class="mermaid">graph LR
+    subgraph App[&quot;index.html - Single Page App&quot;]
+        SB[&quot;Status Bar&lt;br/&gt;Connection dot + IP&quot;]
+        TP[&quot;Touchpad&lt;br/&gt;1-finger move&lt;br/&gt;2-finger scroll&lt;br/&gt;tap click&quot;]
+        CB[&quot;Click Bar&lt;br/&gt;Left | Drag | Right&quot;]
+        MP[&quot;Media Page&lt;br/&gt;Play/Pause | Next/Prev&lt;br/&gt;Vol Up/Down | Mute&quot;]
+        LP[&quot;Link Page&lt;br/&gt;Tunnel URL + Copy&lt;br/&gt;Email Request Form&quot;]
+        SP[&quot;Sensitivity Panel&lt;br/&gt;Slider 0.2x–3.0x&quot;]
+        BN[&quot;Bottom Nav&lt;br/&gt;Touchpad | Media | Link&quot;]
+    end
+
+    BN --&gt; TP
+    BN --&gt; MP
+    BN --&gt; LP
+    TP --&gt; CB
+    TP --&gt; SP</pre>
+
+<h4>Key Design Decisions</h4>
+
+<table>
+<tr><th>Decision</th><th>Rationale</th></tr>
+<tr><td>----------</td><td>-----------</td></tr>
+<tr><td><strong>No build step</strong></td><td>Served as-is. No npm, webpack, vite on the laptop</td></tr>
+<tr><td><strong>Local socket.io (49 KB)</strong></td><td>Eliminates 3-minute CDN load on phone hotspot</td></tr>
+<tr><td><strong>Touch Events API</strong></td><td>Broader mobile compatibility than Pointer Events</td></tr>
+<tr><td><strong>WebSocket-first transport</strong></td><td><code>['websocket', 'polling']</code> — instant connect, polling fallback</td></tr>
+<tr><td><strong>Script at bottom of <code><body></code></strong></td><td>Page renders before 49 KB library downloads</td></tr>
+<tr><td><strong>touch-action: manipulation</strong></td><td>Prevents double-tap zoom on mobile</td></tr>
+<tr><td><strong>appearance: none on slider</strong></td><td>Firefox compatibility for sensitivity slider</td></tr>
+<tr><td><strong>Haptic feedback</strong></td><td><code>navigator.vibrate(10)</code> on clicks (not on iOS)</td></tr>
+</table>
+
+<h3>2. Server (<code>src/server.py</code>)</h3>
+
+<p>Python application built on Flask + Flask-SocketIO with eventlet async mode. Serves frontend, manages WebSocket connections, and executes OS control via pyautogui.</p>
+
+<h4>Internal Architecture</h4>
+
+<pre class="mermaid">graph TB
+    subgraph Server[&quot;server.py&quot;]
+
+        subgraph HTTP[&quot;HTTP Layer (Flask)&quot;]
+            INDEX[&quot;GET /&lt;br/&gt;index.html&quot;]
+            SETUP[&quot;GET /setup&lt;br/&gt;setup.html&quot;]
+            STATIC[&quot;GET /static/*&lt;br/&gt;socket.io.min.js&quot;]
+            FAVICON[&quot;GET /favicon.ico&lt;br/&gt;204 No Content&quot;]
+            API_TUNNEL[&quot;GET /api/tunnel-url&lt;br/&gt;{url, local_ip}&quot;]
+            API_SEND[&quot;POST /api/send-url&lt;br/&gt;Email tunnel URL&quot;]
+            API_START[&quot;POST /api/setup-start&lt;br/&gt;Begin setup&quot;]
+            API_STATUS[&quot;GET /api/setup-status&lt;br/&gt;Setup progress&quot;]
+        end
+
+        subgraph WS[&quot;WebSocket Layer (Flask-SocketIO)&quot;]
+            CONN[&quot;connect&lt;br/&gt;→ screen_info&quot;]
+            DISCONN[&quot;disconnect&quot;]
+            MOVE[&quot;mouse_move&lt;br/&gt;→ pyautogui.moveRel&quot;]
+            CLICK[&quot;click&lt;br/&gt;→ pyautogui.click&quot;]
+            SCROLL[&quot;scroll&lt;br/&gt;→ pyautogui.scroll&quot;]
+            MEDIA[&quot;media&lt;br/&gt;→ pyautogui.press&quot;]
+            REQ_TUNNEL[&quot;request_tunnel_url&lt;br/&gt;→ tunnel_url&quot;]
+        end
+
+        subgraph SYS[&quot;System Integration&quot;]
+            PYGUY[&quot;pyautogui&lt;br/&gt;FAILSAFE=False, PAUSE=0&quot;]
+            CF_MGR[&quot;cloudflared Manager&lt;br/&gt;find → start → monitor (30s timeout)&quot;]
+            LOGGER[&quot;Logger&lt;br/&gt;_log() → stdout + events.log&quot;]
+            SETUP_STATE[&quot;Setup State&lt;br/&gt;deque(maxlen=100)&quot;]
+        end
+
+        WS --&gt; PYGUY
+        WS --&gt; LOGGER
+        HTTP --&gt; LOGGER
+        API_START --&gt; SETUP_STATE
+        API_START --&gt; CF_MGR
+        CF_MGR --&gt; LOGGER
+    end</pre>
+
+<h4>WebSocket Event Handlers</h4>
+
+<table>
+<tr><th>Event</th><th>Handler</th><th>Action</th></tr>
+<tr><td>-------</td><td>---------</td><td>--------</td></tr>
+<tr><td><code>connect</code></td><td><code>handle_connect</code></td><td>Send screen dimensions, local IP, tunnel URL</td></tr>
+<tr><td><code>disconnect</code></td><td><code>handle_disconnect</code></td><td>Log disconnection</td></tr>
+<tr><td><code>mouse_move</code></td><td><code>handle_move</code></td><td><code>pyautogui.moveRel(dx, dy)</code></td></tr>
+<tr><td><code>click</code></td><td><code>handle_click</code></td><td><code>pyautogui.click(button)</code></td></tr>
+<tr><td><code>scroll</code></td><td><code>handle_scroll</code></td><td><code>pyautogui.scroll(clicks)</code> — converts px to notches</td></tr>
+<tr><td><code>media</code></td><td><code>handle_media</code></td><td><code>pyautogui.press(playpause/nexttrack/etc.)</code></td></tr>
+<tr><td><code>request_tunnel_url</code></td><td><code>handle_request_tunnel_url</code></td><td>Emit current tunnel URL</td></tr>
+</table>
+
+<h4>Design Decisions</h4>
+
+<table>
+<tr><th>Decision</th><th>Rationale</th></tr>
+<tr><td>----------</td><td>-----------</td></tr>
+<tr><td><strong>eventlet.monkey_patch()</strong></td><td>Enables native WebSocket; without it Flask-SocketIO falls to HTTP-long-polling</td></tr>
+<tr><td><strong>static_folder=None</strong></td><td>Bypasses Flask 3.0's built-in handler which intercepts <code>/static/</code> before our route</td></tr>
+<tr><td><strong>Cache-Control: no-cache</strong> on HTML</td><td>Prevents cached stale frontend</td></tr>
+<tr><td><strong>Cache-Control: max-age=86400</strong> on static</td><td>socket.io.min.js cached 24h on phone</td></tr>
+<tr><td><strong>pyautogui.FAILSAFE = False</strong></td><td>Prevents corner-movement crash</td></tr>
+<tr><td><strong>pyautogui.PAUSE = 0</strong></td><td>Removes 100ms built-in delay between calls</td></tr>
+<tr><td><strong>cloudflared via subprocess.Popen</strong></td><td>Non-blocking tunnel management; 30s timeout with regex URL detection</td></tr>
+</table>
+
+<h3>3. CLI Control Panel (<code>src/cli.py</code>)</h3>
+
+<p>Interactive REPL that launches <code>server.py</code> as a subprocess, captures stdout in real-time, and provides filtered colored display.</p>
+
+<pre class="mermaid">graph TB
+    subgraph CLI[&quot;cli.py Process&quot;]
+        START[&quot;Start&lt;br/&gt;subprocess.Popen(server.py -u)&quot;]
+        READER[&quot;stdout Reader Thread&lt;br/&gt;colorize() → print&quot;]
+        REPL[&quot;Main Thread&lt;br/&gt;input() loop&quot;]
+        CMD_STATUS[&quot;status cmd&lt;br/&gt;→ /api/tunnel-url&quot;]
+        CMD_LOG[&quot;log cmd&lt;br/&gt;→ tail events.log&quot;]
+        CLEANUP[&quot;atexit&lt;br/&gt;terminate → wait(5) → kill&quot;]
+    end
+
+    subgraph Server[&quot;server.py Process&quot;]
+        STDOUT[&quot;stdout&lt;br/&gt;_log() output&quot;]
+        LOGFILE[&quot;events.log&quot;]
+    end
+
+    START --&gt; Server
+    Server --&gt; STDOUT --&gt; READER
+    CMD_LOG --&gt; LOGFILE
+    CLEANUP --&gt; Server</pre>
+
+<h4>Commands</h4>
+
+<table>
+<tr><th>Command</th><th>Description</th></tr>
+<tr><td>---------</td><td>-------------</td></tr>
+<tr><td><code>status</code> or <code>s</code></td><td>Show server status, local IP, tunnel URL</td></tr>
+<tr><td><code>log</code> or <code>l</code></td><td>Show last 20 lines from <code>events.log</code></td></tr>
+<tr><td><code>la</code></td><td>Show ALL lines from <code>events.log</code></td></tr>
+<tr><td><code>clear</code> or <code>cls</code></td><td>Clear terminal screen</td></tr>
+<tr><td><code>help</code> or <code>h</code></td><td>Show command reference</td></tr>
+<tr><td><code>q</code> or <code>exit</code></td><td>Stop server and quit</td></tr>
+</table>
+
+<h4>Design Decisions</h4>
+
+<table>
+<tr><th>Decision</th><th>Rationale</th></tr>
+<tr><td>----------</td><td>-----------</td></tr>
+<tr><td><strong>Subprocess (not threading)</strong></td><td>Flask-SocketIO has known threading issues; separate process avoids GIL</td></tr>
+<tr><td><strong><code>-u</code> flag</strong></td><td>Unbuffered Python output ensures real-time log capture</td></tr>
+<tr><td><strong><code>atexit</code> cleanup</strong></td><td>Ensures server process is killed even if CLI crashes</td></tr>
+<tr><td><strong><code>TimeoutExpired → .kill()</code></strong></td><td>Fallback if graceful terminate fails</td></tr>
+<tr><td><strong>Filtered display</strong></td><td>Hides INFO (mouse moves, scrolls) from live terminal; shows only OK/WARN/ERROR</td></tr>
+<tr><td><strong>Colorama</strong></td><td>Cross-platform colored terminal output</td></tr>
+</table>
+
+<h3>4. Email Service (<code>src/email_service.py</code>)</h3>
+
+<p>Standalone module for sending email via SMTP. Imported by <code>server.py</code>, also runnable from CLI.</p>
+
+<pre class="mermaid">graph TB
+    subgraph email_service.py
+        LOAD_ENV[&quot;load_env()&lt;br/&gt;.env → dict&quot;]
+        BUILD[&quot;build_url_email()&lt;br/&gt;HTML + plain text&lt;br/&gt;MIME multipart&quot;]
+        SEND[&quot;send_email()&lt;br/&gt;SMTP STARTTLS(587)&lt;br/&gt;3 retries&quot;]
+    end
+
+    subgraph .env[&quot;PROJECT_ROOT/.env&quot;]
+        SMTP_HOST
+        SMTP_PORT
+        SMTP_USERNAME
+        SMTP_PASSWORD
+    end
+
+    subgraph Usage[&quot;Usage Modes&quot;]
+        IMPORTED[&quot;server.py import&lt;br/&gt;api_send_url route&quot;]
+        CLI_SEND[&quot;python email_service.py --send &lt;url&gt;&quot;]
+        CLI_TEST[&quot;python email_service.py --test&quot;]
+    end
+
+    LOAD_ENV --&gt; .env
+    BUILD --&gt; SEND
+    IMPORTED --&gt; BUILD
+    CLI_SEND --&gt; BUILD
+    CLI_TEST --&gt; SEND</pre>
+
+<h4>Design Decisions</h4>
+
+<table>
+<tr><th>Decision</th><th>Rationale</th></tr>
+<tr><td>----------</td><td>-----------</td></tr>
+<tr><td><strong>Plain-text MIME alternative</strong></td><td>Ensures deliverability to SMS gateways that strip HTML</td></tr>
+<tr><td><strong>Importable by server.py</strong></td><td><code>api_send_url</code> calls <code>send_email()</code> directly with tunnel URL</td></tr>
+<tr><td><strong>Standalone CLI</strong></td><td>Test SMTP config without starting full server</td></tr>
+<tr><td><strong>Standard library only</strong></td><td><code>smtplib</code> + <code>ssl</code> — zero external dependencies</td></tr>
+<tr><td><strong>3 retries with exponential backoff</strong></td><td>Resilient to transient SMTP failures</td></tr>
+</table>
+
+<h3>5. Cloudflare Tunnel (cloudflared)</h3>
+
+<p>External binary creating a secure HTTPS tunnel from Cloudflare's edge to <code>localhost:5000</code>.</p>
+
+<pre class="mermaid">graph LR
+    PHONE[&quot;Phone Browser&lt;br/&gt;Internet&quot;] -- &quot;HTTPS&quot; --&gt; CF[&quot;Cloudflare Edge&lt;br/&gt;trycloudflare.com&quot;]
+    CF -- &quot;Tunnel&quot; --&gt; CF_BIN[&quot;cloudflared&lt;br/&gt;on Laptop&quot;]
+    CF_BIN -- &quot;localhost:5000&quot; --&gt; SERVER[&quot;Python Server&quot;]</pre>
+
+<p>Provides:</p>
+<ul>
+<li>Public HTTPS URL on any network</li>
+<li>No port forwarding, no static IP, no DNS config</li>
+<li>DDoS protection and edge caching</li>
+</ul>
+
+<p><strong>Limitations:</strong></p>
+<ul>
+<li>URL changes on every restart (free tier)</li>
+<li>Idle timeout after several hours</li>
+<li>Adds 50–200 ms latency vs local access</li>
+</ul>
+
+<hr>
+
+<h2>Data Flow</h2>
+
+<h3>Connection Sequence</h3>
+
+<pre class="mermaid">sequenceDiagram
+    participant Phone
+    participant Flask as Flask HTTP
+    participant WS as Flask-SocketIO
+    participant PYG as pyautogui
+    participant LOG as Logger
+
+    Phone-&gt;&gt;Flask: GET /
+    Flask--&gt;&gt;Phone: index.html (no-cache)
+    Phone-&gt;&gt;Flask: GET /static/socket.io.min.js
+    Flask--&gt;&gt;Phone: socket.io.min.js (max-age=86400)
+
+    Phone-&gt;&gt;WS: WebSocket connect()
+    WS-&gt;&gt;PYG: pyautogui.size()
+    WS--&gt;&gt;Phone: screen_info {width, height, ip, tunnel_url}
+    WS-&gt;&gt;LOG: log_ok(&quot;Client connected&quot;)
+
+    Note over Phone,WS: Ready for interaction</pre>
+
+<h3>Mouse Move Flow</h3>
+
+<pre class="mermaid">sequenceDiagram
+    participant Touch as Phone Touchscreen
+    participant JS as index.html JS
+    participant WS as Flask-SocketIO
+    participant PYG as pyautogui
+    participant LOG as Logger
+
+    Touch-&gt;&gt;JS: touchmove {dx, dy}
+    JS-&gt;&gt;JS: Apply sensitivity multiplier
+    JS-&gt;&gt;JS: Check drag mode (1.2x if active)
+    JS-&gt;&gt;WS: socket.emit(&quot;mouse_move&quot;, {dx, dy})
+    WS-&gt;&gt;PYG: moveRel(int(dx), int(dy))
+    PYG--&gt;&gt;WS: cursor moved
+    WS-&gt;&gt;LOG: log_info(&quot;move (+0012, -0005)&quot;)</pre>
+
+<h3>Click Flow</h3>
+
+<pre class="mermaid">sequenceDiagram
+    participant Touch as Phone Touchscreen
+    participant JS as index.html JS
+    participant WS as Flask-SocketIO
+    participant PYG as pyautogui
+
+    Touch-&gt;&gt;JS: touchend
+    JS-&gt;&gt;JS: Check duration &lt; 400ms &amp; no movement
+    JS-&gt;&gt;JS: navigator.vibrate(10)
+    JS-&gt;&gt;WS: socket.emit(&quot;click&quot;, {button: &quot;left&quot;})
+    WS-&gt;&gt;PYG: click(button=&quot;left&quot;)</pre>
+
+<h3>Two-Finger Scroll Flow</h3>
+
+<pre class="mermaid">sequenceDiagram
+    participant Touch as Phone Touchscreen
+    participant JS as index.html JS
+    participant WS as Flask-SocketIO
+    participant PYG as pyautogui
+
+    Touch-&gt;&gt;JS: touchstart (2 fingers)
+    JS-&gt;&gt;JS: Track finger 1 + finger 2 positions
+    Touch-&gt;&gt;JS: touchmove (2 fingers)
+    JS-&gt;&gt;JS: Calculate dy delta from both fingers
+    JS-&gt;&gt;WS: socket.emit(&quot;scroll&quot;, {dy})
+    WS-&gt;&gt;PYG: scroll(clicks)  # dy/20 = notches</pre>
+
+<h3>Setup Wizard Flow</h3>
+
+<pre class="mermaid">sequenceDiagram
+    participant Phone as Phone Browser
+    participant Flask as Flask HTTP
+    participant WS as Flask-SocketIO
+    participant CFM as cloudflared Manager
+    participant EMAIL as email_service
+
+    Phone-&gt;&gt;Flask: GET /setup
+    Flask--&gt;&gt;Phone: setup.html (no-cache)
+
+    Phone-&gt;&gt;Flask: POST /api/setup-start {case, email?}
+    Flask--&gt;&gt;Phone: {success: true}
+    Flask-&gt;&gt;Flask: Run setup in daemon thread
+    loop Every 1s
+        Phone-&gt;&gt;Flask: GET /api/setup-status
+        Flask--&gt;&gt;Phone: {running, done, logs[], error}
+    end
+
+    alt Case: localhost
+        Flask-&gt;&gt;Flask: Log &quot;Open http://127.0.0.1:5000&quot;
+    else Case: same-wifi
+        Flask-&gt;&gt;Flask: Log &quot;Open http://{ip}:5000&quot;
+    else Case: remote
+        Flask-&gt;&gt;CFM: start_cloudflared()
+        CFM--&gt;&gt;Flask: tunnel URL
+        Flask-&gt;&gt;EMAIL: send_email(url, recipient)
+        Flask-&gt;&gt;Flask: Log tunnel URL + email status
+    end
+
+    Phone--&gt;&gt;Phone: Redirect to index.html</pre>
+
+<hr>
+
+<h2>Logging Architecture</h2>
+
+<pre class="mermaid">graph TB
+    subgraph Server[&quot;server.py&quot;]
+        LOG[&quot;_log(level, msg)&quot;]
+        STDOUT[&quot;print(msg, flush=True)&quot;]
+        FILE[&quot;events.log (append)&quot;]
+        LOG --&gt; STDOUT
+        LOG --&gt; FILE
+    end
+
+    subgraph CLI[&quot;cli.py&quot;]
+        PIPE[&quot;stdout pipe reader&quot;]
+        COLOR[&quot;colorize()&quot;]
+        DISPLAY[&quot;Terminal display&lt;br/&gt;OK=green WARN=yellow ERROR=red&quot;]
+        TAIL[&quot;cmd_log()&lt;br/&gt;→ tail events.log&quot;]
+        PIPE --&gt; COLOR --&gt; DISPLAY
+        TAIL --&gt; DISPLAY
+    end
+
+    subgraph Setup[&quot;Setup API&quot;]
+        SETUP_LOG[&quot;setup_log(msg)&quot;]
+        SETUP_QUEUE[&quot;setup_state[&#x27;logs&#x27;]&lt;br/&gt;deque(maxlen=100)&quot;]
+        SETUP_LOG --&gt; STDOUT
+        SETUP_LOG --&gt; SETUP_QUEUE
+    end</pre>
+
+<hr>
+
+<h2>Security Model</h2>
+
+<p>Remote Mouse has <strong>no authentication</strong>. Security relies on:</p>
+
+<ol>
+<li><strong>Network segmentation</strong> — accessible to anyone on the local network (binds <code>0.0.0.0:5000</code>)</li>
+<li><strong>URL randomness</strong> — Cloudflare tunnel URLs have ~64-bit entropy</li>
+<li><strong>URL volatility</strong> — tunnel URL invalid when cloudflared stops</li>
+<li><strong>Trust model</strong> — designed for personal use on trusted networks</li>
+</ol>
+
+<p>For additional security, consider:</p>
+<ul>
+<li>Running behind a reverse proxy with basic auth</li>
+<li>Firewall rules restricting access to specific IPs</li>
+<li>Binding to a specific interface instead of <code>0.0.0.0</code></li>
+</ul>
+
+<hr>
+
+<h2>Threading Model</h2>
+
+<pre class="mermaid">graph TB
+    subgraph Main[&quot;Main Thread&quot;]
+        SOCKETIO[&quot;socketio.run()&lt;br/&gt;Flask + WebSocket&quot;]
+    end
+    subgraph Daemon[&quot;Daemon Threads&quot;]
+        CF_READER[&quot;cloudflared stdout reader&lt;br/&gt;(start_cloudflared)&quot;]
+        SETUP_RUNNER[&quot;Setup runner&lt;br/&gt;(api_setup_start)&quot;]
+    end
+    subgraph CLI[&quot;CLI Process (separate)&quot;]
+        CLI_MAIN[&quot;REPL input() loop&quot;]
+        CLI_READER[&quot;stdout reader thread&quot;]
+    end</pre>
+
+<ul>
+<li><strong>server.py</strong> runs in its own process</li>
+<li><strong>cli.py</strong> runs as a separate process, connected via pipe to server's stdout</li>
+<li>Setup runs in a daemon thread so the API response returns immediately</li>
+<li>cloudflared stdout reader runs in a daemon thread for non-blocking URL detection</li>
+</ul>
+
+</main>
+</body>
+</html>

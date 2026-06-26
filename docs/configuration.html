@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Configuration — Remote Mouse Docs</title>
+<link rel="stylesheet" href="../css/style.css">
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({startOnLoad:true,theme:'dark',fontSize:13})</script>
+</head>
+<body>
+<nav>
+<h2>Remote Mouse</h2>
+<ul><li><a href="index.html">Home</a></li>
+<li><a href="architecture.html">Architecture</a></li>
+<li><a href="configuration.html" class="active">Configuration</a></li>
+<li><a href="protocol.html">Protocol</a></li>
+<li><a href="troubleshooting.html">Troubleshooting</a></li>
+<li><a href="comparison.html">Comparison</a></li></ul>
+<div class="section-title">Reference</div>
+<ul>
+<li><a href="index.html">Home</a></li>
+<li><a href="architecture.html">Architecture</a></li>
+<li><a href="configuration.html" class="active">Configuration</a></li>
+<li><a href="protocol.html">Protocol</a></li>
+<li><a href="troubleshooting.html">Troubleshooting</a></li>
+<li><a href="comparison.html">Comparison</a></li>
+</ul>
+</nav>
+<main>
+<h1>Configuration Reference</h1>
+
+<p><strong>Version:</strong> v1.0.0  </p>
+<p><strong>Last updated:</strong> 2026-06-26</p>
+
+<p>This document describes every configuration option in Remote Mouse — environment variables, server settings, frontend tunables, file paths, and customization points.</p>
+
+<hr>
+
+<h2>Configuration Loading Order</h2>
+
+<pre class="mermaid">graph TD
+    ENV_FILE[&quot;.env file&lt;br/&gt;PROJECT_ROOT/.env&quot;] --&gt; CONFIG[&quot;Configuration Dict&quot;]
+    ENV_VARS[&quot;Environment Variables&lt;br/&gt;SMTP_HOST, SMTP_PORT, etc.&quot;] --&gt; CONFIG
+    DEFAULTS[&quot;Hardcoded Defaults&lt;br/&gt;server.py, email_service.py&quot;] --&gt; CONFIG
+    CONFIG --&gt; EMAIL[&quot;email_service.py&quot;]
+    CONFIG --&gt; SERVER[&quot;server.py&lt;br/&gt;(imported via load_env)&quot;]</pre>
+
+<p>Values are resolved in order: <code>.env</code> file → environment variables → hardcoded defaults.</p>
+
+<hr>
+
+<h2>Environment Variables (.env)</h2>
+
+<p>Create by copying <code>.env.example</code> at project root:</p>
+
+<pre><code>cp .env.example .env</code></pre>
+
+<h3>SMTP Settings</h3>
+
+<table>
+<tr><th>Variable</th><th>Required</th><th>Default</th><th>Description</th></tr>
+<tr><td>----------</td><td>----------</td><td>---------</td><td>-------------</td></tr>
+<tr><td><code>SMTP_HOST</code></td><td>Yes</td><td>—</td><td>SMTP server hostname (e.g., <code>smtp.gmail.com</code>)</td></tr>
+<tr><td><code>SMTP_PORT</code></td><td>No</td><td><code>587</code></td><td>SMTP port (<code>587</code> STARTTLS, <code>465</code> SSL)</td></tr>
+<tr><td><code>SMTP_USERNAME</code></td><td>Yes</td><td>—</td><td>SMTP auth username (usually your email)</td></tr>
+<tr><td><code>SMTP_PASSWORD</code></td><td>Yes</td><td>—</td><td>SMTP password or App Password</td></tr>
+<tr><td><code>SMTP_FROM_EMAIL</code></td><td>No</td><td>same as <code>SMTP_USERNAME</code></td><td>From: address in sent emails</td></tr>
+<tr><td><code>SMTP_TO_EMAIL</code></td><td>Yes*</td><td>—</td><td>Default recipient for CLI <code>--test</code> mode</td></tr>
+</table>
+
+<p>\* <code>SMTP_TO_EMAIL</code> required for <code>--test</code>; when server sends via <code>/api/send-url</code>, recipient comes from POST body.</p>
+
+<h3>Provider Examples</h3>
+
+<pre><code># Gmail (requires App Password with 2FA enabled)
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USERNAME=your.name@gmail.com
+SMTP_PASSWORD=xxxx xxxx xxxx xxxx
+SMTP_FROM_EMAIL=your.name@gmail.com
+SMTP_TO_EMAIL=5551234567@vtext.com
+
+# Outlook
+SMTP_HOST=smtp-mail.outlook.com
+SMTP_PORT=587
+SMTP_USERNAME=your.name@outlook.com
+SMTP_PASSWORD=your-password
+
+# Yahoo Mail (requires App Password)
+SMTP_HOST=smtp.mail.yahoo.com
+SMTP_PORT=587
+SMTP_USERNAME=your.name@yahoo.com
+SMTP_PASSWORD=your-app-password</code></pre>
+
+<hr>
+
+<h2>Server Configuration (<code>src/server.py</code>)</h2>
+
+<p>All server settings are defined directly in <code>server.py</code>. No external config file.</p>
+
+<h3>Port and Bind</h3>
+
+<pre><code>socketio.run(app, host=&#x27;0.0.0.0&#x27;, port=5000, debug=False)</code></pre>
+
+<table>
+<tr><th>Parameter</th><th>Current Value</th><th>Description</th></tr>
+<tr><td>-----------</td><td>--------------</td><td>-------------</td></tr>
+<tr><td><code>host</code></td><td><code>'0.0.0.0'</code></td><td>Listen on all interfaces (accessible from LAN). Change to <code>'127.0.0.1'</code> for local-only</td></tr>
+<tr><td><code>port</code></td><td><code>5000</code></td><td>TCP port. Change if port is in use</td></tr>
+<tr><td><code>debug</code></td><td><code>False</code></td><td>Flask debug mode. Enable for development with auto-reload</td></tr>
+</table>
+
+<p><strong>If you change the port</strong>, update:</p>
+<ol>
+<li>Startup scripts (<code>scripts/start.ps1</code>, <code>scripts/start.sh</code>)</li>
+<li>Windows Firewall rule</li>
+<li>CLI setup URL: <code>SETUP_URL = 'http://localhost:5000/setup'</code> in <code>cli.py</code></li>
+</ol>
+
+<h3>Secret Key</h3>
+
+<pre><code>app.config[&#x27;SECRET_KEY&#x27;] = os.urandom(24).hex()</code></pre>
+
+<p>Randomly generated on each server start. Used internally by Flask-SocketIO for session signing. Not security-critical since there is no authentication.</p>
+
+<h3>pyautogui Tuning</h3>
+
+<pre><code>pyautogui.FAILSAFE = False
+pyautogui.PAUSE = 0</code></pre>
+
+<table>
+<tr><th>Setting</th><th>Default</th><th>Current</th><th>Effect</th></tr>
+<tr><td>---------</td><td>---------</td><td>---------</td><td>--------</td></tr>
+<tr><td><code>FAILSAFE</code></td><td><code>True</code></td><td><code>False</code></td><td>When True, mouse in corner raises exception. Disabled to prevent crashes</td></tr>
+<tr><td><code>PAUSE</code></td><td><code>0.1</code></td><td><code>0</code></td><td>Built-in 100ms delay between calls. Set to 0 for zero latency</td></tr>
+</table>
+
+<h3>Socket.IO Options</h3>
+
+<pre><code>socketio = SocketIO(app, async_mode=&#x27;eventlet&#x27;, cors_allowed_origins=&quot;*&quot;,
+                    ping_interval=5, ping_timeout=3)</code></pre>
+
+<table>
+<tr><th>Option</th><th>Value</th><th>Description</th></tr>
+<tr><td>--------</td><td>-------</td><td>-------------</td></tr>
+<tr><td><code>async_mode</code></td><td><code>'eventlet'</code></td><td>WebSocket-native async. Must match <code>eventlet.monkey_patch()</code> at line 1</td></tr>
+<tr><td><code>cors_allowed_origins</code></td><td><code>"*"</code></td><td>Allow connections from any origin (needed for tunnel access)</td></tr>
+<tr><td><code>ping_interval</code></td><td><code>5</code></td><td>Ping every 5 seconds to keep connection alive</td></tr>
+<tr><td><code>ping_timeout</code></td><td><code>3</code></td><td>Wait 3 seconds for ping response before disconnecting</td></tr>
+</table>
+
+<h3>Cache Control</h3>
+
+<pre><code># index.html, setup.html — never cache
+resp.headers[&#x27;Cache-Control&#x27;] = &#x27;no-cache, must-revalidate&#x27;
+
+# static/* (socket.io.min.js) — cache 24h
+resp.headers[&#x27;Cache-Control&#x27;] = &#x27;public, max-age=86400&#x27;</code></pre>
+
+<table>
+<tr><th>Route</th><th>Cache Policy</th><th>Reason</th></tr>
+<tr><td>-------</td><td>-------------</td><td>--------</td></tr>
+<tr><td><code>/</code> (index.html)</td><td><code>no-cache</code></td><td>Always serve latest frontend</td></tr>
+<tr><td><code>/setup</code> (setup.html)</td><td><code>no-cache</code></td><td>Always serve latest setup wizard</td></tr>
+<tr><td><code>/static/*</code></td><td><code>max-age=86400</code></td><td>socket.io.min.js (49 KB) — cache on phone for 24h</td></tr>
+</table>
+
+<hr>
+
+<h2>File Paths</h2>
+
+<p>All paths derive from <code>PROJECT_ROOT</code>:</p>
+
+<pre><code>PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# Resolves to: E:\GitHub Projects\Remote_Mouse\
+
+FRONTEND_DIR = os.path.join(PROJECT_ROOT, &#x27;frontend&#x27;)
+# Resolves to: .../Remote_Mouse/frontend/
+
+STATIC_DIR = os.path.join(FRONTEND_DIR, &#x27;static&#x27;)
+# Resolves to: .../Remote_Mouse/frontend/static/</code></pre>
+
+<h3>File Reference</h3>
+
+<pre class="mermaid">graph TD
+    ROOT[&quot;PROJECT_ROOT&lt;br/&gt;Remote_Mouse/&quot;]
+    ROOT --&gt; SRC[&quot;src/&lt;br/&gt;server.py, cli.py, email_service.py&quot;]
+    ROOT --&gt; FRONTEND[&quot;frontend/&quot;]
+    ROOT --&gt; DOCS[&quot;docs/&quot;]
+    ROOT --&gt; ENV[&quot;.env&lt;br/&gt;SMTP config&quot;]
+    ROOT --&gt; LOG[&quot;events.log&lt;br/&gt;Runtime log&quot;]
+    ROOT --&gt; TUNNEL[&quot;.tunnel_url&lt;br/&gt;Cloudflare URL&quot;]
+    ROOT --&gt; EXAMPLE[&quot;.env.example&lt;br/&gt;Template&quot;]
+    FRONTEND --&gt; INDEX[&quot;index.html&lt;br/&gt;Main UI&quot;]
+    FRONTEND --&gt; SETUP[&quot;setup.html&lt;br/&gt;Wizard&quot;]
+    FRONTEND --&gt; STATIC[&quot;static/&lt;br/&gt;socket.io.min.js&quot;]</pre>
+
+<table>
+<tr><th>Path</th><th>Type</th><th>Purpose</th></tr>
+<tr><td>------</td><td>------</td><td>---------</td></tr>
+<tr><td><code>PROJECT_ROOT/.env</code></td><td>Config</td><td>SMTP credentials (gitignored)</td></tr>
+<tr><td><code>PROJECT_ROOT/.env.example</code></td><td>Template</td><td>Copy to <code>.env</code> and fill in</td></tr>
+<tr><td><code>PROJECT_ROOT/events.log</code></td><td>Runtime</td><td>All server events with timestamps (gitignored)</td></tr>
+<tr><td><code>PROJECT_ROOT/.tunnel_url</code></td><td>Runtime</td><td>Current cloudflared URL (gitignored)</td></tr>
+<tr><td><code>PROJECT_ROOT/src/server.py</code></td><td>Source</td><td>Flask + WebSocket + pyautogui</td></tr>
+<tr><td><code>PROJECT_ROOT/src/cli.py</code></td><td>Source</td><td>REPL control panel</td></tr>
+<tr><td><code>PROJECT_ROOT/src/email_service.py</code></td><td>Source</td><td>SMTP email sender</td></tr>
+<tr><td><code>PROJECT_ROOT/frontend/index.html</code></td><td>Frontend</td><td>Main mouse control page</td></tr>
+<tr><td><code>PROJECT_ROOT/frontend/setup.html</code></td><td>Frontend</td><td>Setup wizard</td></tr>
+<tr><td><code>PROJECT_ROOT/frontend/static/socket.io.min.js</code></td><td>Asset</td><td>Socket.IO client v4.7.5 (49 KB)</td></tr>
+</table>
+
+<hr>
+
+<h2>Frontend Tunables (<code>frontend/index.html</code>)</h2>
+
+<h3>Socket.IO Connection</h3>
+
+<table>
+<tr><th>Option</th><th>Current Value</th><th>Description</th></tr>
+<tr><td>--------</td><td>---------------</td><td>-------------</td></tr>
+<tr><td><code>transports</code></td><td><code>['websocket', 'polling']</code></td><td>WebSocket first, HTTP fallback</td></tr>
+<tr><td><code>reconnection</code></td><td><code>true</code></td><td>Auto-reconnect on disconnect</td></tr>
+<tr><td><code>reconnectionAttempts</code></td><td><code>Infinity</code></td><td>Never stop reconnecting</td></tr>
+<tr><td><code>reconnectionDelay</code></td><td><code>1000</code></td><td>Initial delay before first retry (ms)</td></tr>
+<tr><td><code>reconnectionDelayMax</code></td><td><code>5000</code></td><td>Max delay between retries (ms)</td></tr>
+</table>
+
+<h3>Sensitivity Slider</h3>
+
+<pre><code>&lt;input type=&quot;range&quot; id=&quot;sens-slider&quot; min=&quot;0.2&quot; max=&quot;3.0&quot; step=&quot;0.1&quot; value=&quot;1.0&quot;&gt;</code></pre>
+
+<table>
+<tr><th>Attribute</th><th>Value</th><th>Description</th></tr>
+<tr><td>-----------</td><td>-------</td><td>-------------</td></tr>
+<tr><td><code>min</code></td><td><code>0.2</code></td><td>Slowest cursor speed</td></tr>
+<tr><td><code>max</code></td><td><code>3.0</code></td><td>Fastest cursor speed</td></tr>
+<tr><td><code>step</code></td><td><code>0.1</code></td><td>Granularity of adjustment</td></tr>
+<tr><td><code>value</code></td><td><code>1.0</code></td><td>Default (no multiplier)</td></tr>
+</table>
+
+<h3>Tap Threshold</h3>
+
+<pre><code>if (Date.now() - touchStartTime &lt; 400) { /* tap detected */ }</code></pre>
+
+<table>
+<tr><th>Constant</th><th>Location</th><th>Effect</th></tr>
+<tr><td>----------</td><td>----------</td><td>--------</td></tr>
+<tr><td><code>400</code></td><td>touchpad touchend handler</td><td>Max ms for a touch to count as a tap</td></tr>
+</table>
+
+<p>Lower (e.g., <code>200</code>): only very quick touches click. Higher (e.g., <code>600</code>): slow touches also click.</p>
+
+<h3>Movement Dead Zone</h3>
+
+<pre><code>if (Math.abs(dx) &gt; 1 || Math.abs(dy) &gt; 1) { /* send move event */ }</code></pre>
+
+<table>
+<tr><th>Value</th><th>Effect</th></tr>
+<tr><td>-------</td><td>--------</td></tr>
+<tr><td><code>1</code> px</td><td>Ignore sub-1px jitter. Increase to 3–5 for noisier screens</td></tr>
+</table>
+
+<h3>Drag Mode Multiplier</h3>
+
+<pre><code>// Drag mode applies 1.2x extra multiplier
+socket.emit(&#x27;mouse_move&#x27;, { dx: dx * sensitivity * 1.2, dy: dy * sensitivity * 1.2 });</code></pre>
+
+<table>
+<tr><th>Value</th><th>Location</th><th>Effect</th></tr>
+<tr><td>-------</td><td>----------</td><td>--------</td></tr>
+<tr><td><code>1.2</code></td><td>touchmove handler when dragMode=true</td><td>Makes dragging slightly faster for cross-screen selections</td></tr>
+</table>
+
+<h3>Two-Finger Scroll Sensitivity</h3>
+
+<p>The scroll delta calculation in <code>server.py</code>:</p>
+
+<pre><code>clicks = max(1, abs(int(dy / 20)))</code></pre>
+
+<table>
+<tr><th>Value</th><th>Effect</th></tr>
+<tr><td>-------</td><td>--------</td></tr>
+<tr><td><code>20</code></td><td>Pixels per scroll notch. Lower = more sensitive (fewer pixels per notch)</td></tr>
+</table>
+
+<hr>
+
+<h2>Network Configuration</h2>
+
+<h3>Connection Modes</h3>
+
+<pre class="mermaid">graph TD
+    subgraph Setup[&quot;Setup Wizard Connection Cases&quot;]
+        LOCAL[&quot;Localhost&lt;br/&gt;Same machine&quot;]
+        SAME[&quot;Same WiFi&lt;br/&gt;Local network&quot;]
+        REMOTE[&quot;Remote&lt;br/&gt;Different networks&quot;]
+    end
+
+    subgraph Required[&quot;Setup Steps&quot;]
+        LOCAL_R[&quot;Open http://127.0.0.1:5000&quot;]
+        SAME_R[&quot;Open http://{local_ip}:5000&lt;br/&gt;Firewall must allow port 5000&quot;]
+        REMOTE_R[&quot;cloudflared tunnel&lt;br/&gt;Email URL to phone&quot;]
+    end
+
+    LOCAL --&gt; LOCAL_R
+    SAME --&gt; SAME_R
+    REMOTE --&gt; REMOTE_R</pre>
+
+<h3>Firewall Rule (Windows)</h3>
+
+<pre><code># Verify rule exists
+netsh advfirewall firewall show rule name=&quot;Remote Mouse 5000&quot;
+
+# Add rule (if missing)
+netsh advfirewall firewall add rule name=&quot;Remote Mouse 5000&quot; dir=in action=allow protocol=TCP localport=5000
+
+# Delete and recreate with new port
+netsh advfirewall firewall delete rule name=&quot;Remote Mouse 5000&quot;
+netsh advfirewall firewall add rule name=&quot;Remote Mouse 5000&quot; dir=in action=allow protocol=TCP localport=8080</code></pre>
+
+<h3>Static IP (Optional)</h3>
+
+<p>Set a static IP to avoid URL changes on every boot:</p>
+
+<p><strong>Windows:</strong> Settings > Network & Internet > WiFi > Hardware properties > Edit IP assignment > Manual > On</p>
+<ul>
+<li>IP: Outside DHCP range (e.g., <code>10.0.0.100</code>)</li>
+<li>Subnet: <code>255.255.255.0</code></li>
+<li>Gateway: Router IP</li>
+<li>DNS: <code>8.8.8.8</code> / <code>1.1.1.1</code></li>
+</ul>
+
+<hr>
+
+<h2>CLI Configuration (<code>src/cli.py</code>)</h2>
+
+<table>
+<tr><th>Setting</th><th>Value</th><th>Description</th></tr>
+<tr><td>---------</td><td>-------</td><td>-------------</td></tr>
+<tr><td><code>SETUP_URL</code></td><td><code>'http://localhost:5000/setup'</code></td><td>Auto-opened in browser on CLI start</td></tr>
+<tr><td><code>EVENT_LOG_FILE</code></td><td><code>ProjectRoot/events.log</code></td><td>Path to log file for <code>log</code> command</td></tr>
+<tr><td><code>TUNNEL_URL_FILE</code></td><td><code>ProjectRoot/.tunnel_url</code></td><td>Path to tunnel URL for <code>status</code> command</td></tr>
+<tr><td>Color coding</td><td>Green=OK, Yellow=WARN, Red=ERROR</td><td>Applied by <code>colorize()</code> based on prefix</td></tr>
+</table>
+
+<hr>
+
+<h2>Startup Scripts</h2>
+
+<h3>Windows (<code>scripts/start.ps1</code>)</h3>
+
+<pre><code>$ProjectRoot = Split-Path -Parent $PSScriptRoot
+# All other paths derive from $ProjectRoot</code></pre>
+
+<h3>Linux/macOS (<code>scripts/start.sh</code>)</h3>
+
+<pre><code>PROJECT_ROOT=$(dirname &quot;$(dirname &quot;$0&quot;)&quot;)
+cd &quot;$PROJECT_ROOT&quot; || exit 1</code></pre>
+
+<hr>
+
+<h2>Version-Specific Config</h2>
+
+<h3>v1.0.0 — DPI Presets (Current)</h3>
+
+<table>
+<tr><th>Feature</th><th>Config Point</th><th>Default</th><th>Location</th></tr>
+<tr><td>---------</td><td>-------------</td><td>---------</td><td>----------</td></tr>
+<tr><td>DPI preset buttons</td><td>400, 800, 1600, 3200</td><td>Added to click bar</td><td><code>frontend/index.html</code></td></tr>
+<tr><td>DPI label</td><td>Shows "400 DPI" etc. next to preset</td><td>In settings panel</td><td><code>frontend/index.html</code></td></tr>
+<tr><td>Sensitivity–DPI mapping</td><td><code>base_dpi = 800</code></td><td>Server-side conversion</td><td><code>src/server.py</code></td></tr>
+</table>
+
+<hr>
+
+<h2>Events Log</h2>
+
+<p>Auto-created at <code>PROJECT_ROOT/events.log</code>. All server events with timestamps:</p>
+
+<pre><code>[19:30:22] OK Server starting on port 5000...
+[19:30:22] INFO Local: http://10.0.0.5:5000
+[19:31:05] OK Client connected
+[19:31:12] INFO move   (+0045, -0023)
+[19:31:14] OK click  left
+[19:31:18] INFO scroll (+00120)</code></pre>
+
+<p><strong>Note:</strong> Grows without rotation. Clear periodically or add log rotation for long sessions.</p>
+
+</main>
+</body>
+</html>

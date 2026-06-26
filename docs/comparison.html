@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Comparison — Remote Mouse Docs</title>
+<link rel="stylesheet" href="../css/style.css">
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({startOnLoad:true,theme:'dark',fontSize:13})</script>
+</head>
+<body>
+<nav>
+<h2>Remote Mouse</h2>
+<ul><li><a href="index.html">Home</a></li>
+<li><a href="architecture.html">Architecture</a></li>
+<li><a href="configuration.html">Configuration</a></li>
+<li><a href="protocol.html">Protocol</a></li>
+<li><a href="troubleshooting.html">Troubleshooting</a></li>
+<li><a href="comparison.html" class="active">Comparison</a></li></ul>
+<div class="section-title">Reference</div>
+<ul>
+<li><a href="index.html">Home</a></li>
+<li><a href="architecture.html">Architecture</a></li>
+<li><a href="configuration.html">Configuration</a></li>
+<li><a href="protocol.html">Protocol</a></li>
+<li><a href="troubleshooting.html">Troubleshooting</a></li>
+<li><a href="comparison.html" class="active">Comparison</a></li>
+</ul>
+</nav>
+<main>
+<h1>Remote Mouse vs. Wired Mouse — Spec Comparison</h1>
+
+<p><strong>Current version:</strong> v1.0.0 (DPI presets)  </p>
+<p><strong>Baseline:</strong> v5.0.1 (scored 34/100)  </p>
+<p><strong>Last updated:</strong> 2026-06-26</p>
+
+<p>Each spec scored 0–100 relative to a typical wired mouse.</p>
+
+<hr>
+
+<h2>Score Overview</h2>
+
+<pre class="mermaid">%%{init: {&#x27;theme&#x27;: &#x27;dark&#x27;, &#x27;themeVariables&#x27;: { &#x27;darkMode&#x27;: true }}}%%
+xychart-beta
+    title &quot;Remote Mouse v1.0.0 — Score per Spec (0-100)&quot;
+    x-axis [&quot;DPI&quot;,&quot;CPI&quot;,&quot;Poll&quot;,&quot;IPS&quot;,&quot;MaxAcc&quot;,&quot;Sensor&quot;,&quot;Model&quot;,&quot;Latency&quot;,&quot;LOD&quot;,&quot;Debounce&quot;,&quot;Switches&quot;,&quot;Durability&quot;,&quot;Buttons&quot;,&quot;Prog&quot;,&quot;Memory&quot;,&quot;Wired&quot;,&quot;Battery&quot;,&quot;Weight&quot;,&quot;Dims&quot;,&quot;Ergo&quot;,&quot;Grip&quot;,&quot;RGB&quot;,&quot;Software&quot;,&quot;Compat&quot;]
+    y-axis &quot;Score&quot; 0 --&gt; 100
+    bar [45, 15, 30, 5, 0, 50, 20, 20, 30, 10, 10, 0, 15, 0, 0, 40, 70, 70, 40, 15, 40, 100, 100, 100]</pre>
+
+<hr>
+
+<h2>Comparison Table</h2>
+
+<table>
+<tr><th>#</th><th>Spec</th><th>Wired Mouse (score)</th><th>v1.0.0 (score)</th><th>Gap</th><th>Key Difference</th></tr>
+<tr><td>---</td><td>------</td><td>-------------------:</td><td>----------------:</td><td>----:</td><td>----------------</td></tr>
+<tr><td>1</td><td>DPI</td><td>100</td><td>45</td><td>55</td><td>Hardware presets vs. slider + 4 buttons</td></tr>
+<tr><td>2</td><td>CPI</td><td>100</td><td>15</td><td>85</td><td>Can read system CPI but doesn't display it</td></tr>
+<tr><td>3</td><td>Polling Rate</td><td>100</td><td>30</td><td>70</td><td>125–1000 Hz fixed vs. 30–120 Hz uncontrolled</td></tr>
+<tr><td>4</td><td>IPS</td><td>100</td><td>5</td><td>95</td><td>Hardware cap vs. no cap or acceleration</td></tr>
+<tr><td>5</td><td>Max Acceleration</td><td>100</td><td>0</td><td>100</td><td>20–50G vs. no acceleration features</td></tr>
+<tr><td>6</td><td>Sensor Type</td><td>100</td><td>50</td><td>50</td><td>Optical/laser vs. phone touchscreen (different tech)</td></tr>
+<tr><td>7</td><td>Sensor Model</td><td>100</td><td>20</td><td>80</td><td>Identifiable vs. can detect but doesn't use</td></tr>
+<tr><td>8</td><td>Click Latency</td><td>100</td><td>20</td><td>80</td><td>1–5 ms vs. 10–100 ms</td></tr>
+<tr><td>9</td><td>LOD</td><td>100</td><td>30</td><td>70</td><td>1–3 mm adjustable vs. binary on/off</td></tr>
+<tr><td>10</td><td>Debounce Time</td><td>100</td><td>10</td><td>90</td><td>Hardware circuit vs. not implemented</td></tr>
+<tr><td>11</td><td>Switch Type</td><td>100</td><td>10</td><td>90</td><td>Tactile+audible vs. silent tap</td></tr>
+<tr><td>12</td><td>Click Durability</td><td>100</td><td>0</td><td>100</td><td>Rated lifespan vs. not tracked</td></tr>
+<tr><td>13</td><td>Number of Buttons</td><td>100</td><td>15</td><td>85</td><td>3–12 vs. 2</td></tr>
+<tr><td>14</td><td>Programmable Buttons</td><td>100</td><td>0</td><td>100</td><td>Remapping+macros vs. fixed</td></tr>
+<tr><td>15</td><td>Onboard Memory</td><td>100</td><td>0</td><td>100</td><td>Profiles on device vs. session-only</td></tr>
+<tr><td>16</td><td>Wired Connectivity</td><td>100</td><td>40</td><td>60</td><td>USB zero-config vs. WiFi+URL+setup</td></tr>
+<tr><td>17</td><td>Bluetooth</td><td>—</td><td>—</td><td>—</td><td>N/A — not supported</td></tr>
+<tr><td>18</td><td>2.4 GHz Wireless</td><td>—</td><td>—</td><td>—</td><td>N/A — not supported</td></tr>
+<tr><td>19</td><td>Battery Life</td><td>100</td><td>70</td><td>30</td><td>USB-powered vs. phone+battery</td></tr>
+<tr><td>20</td><td>Charging Port</td><td>—</td><td>—</td><td>—</td><td>N/A</td></tr>
+<tr><td>21</td><td>Fast Charging</td><td>—</td><td>—</td><td>—</td><td>N/A</td></tr>
+<tr><td>22</td><td>Weight</td><td>100</td><td>70</td><td>30</td><td>50–150 g physical vs. zero (weightless)</td></tr>
+<tr><td>23</td><td>Dimensions</td><td>100</td><td>40</td><td>60</td><td>Fixed hand-sized vs. phone-dependent</td></tr>
+<tr><td>24</td><td>Ergonomics</td><td>100</td><td>15</td><td>85</td><td>Contoured vs. flat rectangle</td></tr>
+<tr><td>25</td><td>Grip Style</td><td>100</td><td>40</td><td>60</td><td>Palm/claw/fingertip vs. touch-based</td></tr>
+<tr><td>26</td><td>PTFE Feet</td><td>—</td><td>—</td><td>—</td><td>N/A — phone on desk</td></tr>
+<tr><td>27</td><td>Build Material</td><td>—</td><td>—</td><td>—</td><td>N/A — phone-dependent</td></tr>
+<tr><td>28</td><td>RGB Lighting</td><td>60</td><td>100</td><td>–40</td><td>Aesthetic LEDs vs. none (win)</td></tr>
+<tr><td>29</td><td>Software/Drivers</td><td>40</td><td>100</td><td>–60</td><td>500 MB bloatware vs. 66 KB browser</td></tr>
+<tr><td>30</td><td>Compatibility</td><td>80</td><td>100</td><td>–20</td><td>USB HID only vs. any browser device</td></tr>
+</table>
+
+<hr>
+
+<h2>Score Distribution</h2>
+
+<pre class="mermaid">%%{init: {&#x27;theme&#x27;: &#x27;dark&#x27;, &#x27;themeVariables&#x27;: { &#x27;darkMode&#x27;: true }}}%%
+pie title Remote Mouse v1.0.0 — Score Buckets (23 scored specs)
+    &quot;90–100 (Wins)&quot; : 3
+    &quot;70–89 (Strong)&quot; : 1
+    &quot;50–69 (Average)&quot; : 2
+    &quot;30–49 (Weak)&quot; : 4
+    &quot;10–29 (Poor)&quot; : 6
+    &quot;0 (Nonexistent)&quot; : 7</pre>
+
+<hr>
+
+<h2>Overall Score</h2>
+
+<table>
+<tr><th>Metric</th><th>Wired Mouse</th><th>Remote Mouse v1.0.0</th></tr>
+<tr><td>--------</td><td>:-----------:</td><td>:-------------------:</td></tr>
+<tr><td>Scored specs</td><td>23 of 30</td><td>23 of 30</td></tr>
+<tr><td>Average score</td><td><strong>95/100</strong></td><td><strong>35/100</strong></td></tr>
+<tr><td>Raw aggregate</td><td>2180 / 2300</td><td>805 / 2300</td></tr>
+</table>
+
+<hr>
+
+<h2>Category Breakdown</h2>
+
+<table>
+<tr><th>Group</th><th>Wired</th><th>v1.0.0</th><th>Anchor Spec</th></tr>
+<tr><td>-------</td><td>:----:</td><td>:------:</td><td>-------------</td></tr>
+<tr><td>v1 — Motion & Tracking</td><td>100</td><td>19</td><td>Max Accel (0), IPS (5)</td></tr>
+<tr><td>v2 — Sensing & Clicks</td><td>100</td><td>26</td><td>Debounce (10), Sensor Model (20)</td></tr>
+<tr><td>v3 — Switches & Buttons</td><td>100</td><td>5</td><td>Durability/Programmable/Memory (0)</td></tr>
+<tr><td>v4 — Connectivity</td><td>100</td><td>55</td><td>Wired simplicity vs. remote setup</td></tr>
+<tr><td>v5 — Physical</td><td>100</td><td>33</td><td>Ergonomics (15)</td></tr>
+<tr><td>v6 — Extras</td><td>60</td><td>100</td><td>v1.0.0 wins all three</td></tr>
+</table>
+
+<h2>Interpretation</h2>
+
+<p><strong>35/100</strong> means Remote Mouse v1.0.0 is not a wired mouse replacement. It excels at:</p>
+
+<ul>
+<li><strong>Zero friction</strong> — no install, no drivers, any device</li>
+<li><strong>Mobility</strong> — control from anywhere in the room (or world with tunnel)</li>
+</ul>
+
+<p>It fails at the fundamental tactile experience:</p>
+
+<ul>
+<li>5 specs score 0 (acceleration, durability, programmability, onboard memory)</li>
+<li>6 specs score ≤15 (CPI display, IPS, buttons, debounce, switch type, ergonomics)</li>
+<li>Only 3 specs beat a wired mouse (RGB avoidance, no bloatware, broader compatibility)</li>
+</ul>
+
+<p>The 120-version plan targets closing the gap from 35 → ~95 by turning every ❌ into a fully emulated equivalent.</p>
+
+</main>
+</body>
+</html>
