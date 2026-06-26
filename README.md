@@ -1,6 +1,16 @@
 # Remote Mouse
 
-Turn your phone into a wireless mouse and media remote for your laptop. Zero installation on the phone — just open a URL in the browser.
+Turn your phone into a wireless mouse and media remote for your laptop. Zero phone installation: the laptop runs a Python server (Flask + SocketIO + pyautogui), the phone just opens a URL. Features touchpad with DPI presets (400/800/1600/3200), two-finger scroll, media controls, Cloudflare tunnel for remote access, and SMTP email delivery of a URL.
+
+<div align="center">
+  <img src="https://img.shields.io/badge/python-3.12-blue?logo=python" alt="Python 3.12"/>
+  <img src="https://img.shields.io/badge/Flask-000?logo=flask" alt="Flask"/>
+  <img src="https://img.shields.io/badge/Socket.IO-010101?logo=socket.io" alt="Socket.IO"/>
+  <img src="https://img.shields.io/badge/JavaScript-F7DF1E?logo=javascript&logoColor=000" alt="JavaScript"/>
+  <img src="https://img.shields.io/badge/HTML5-E34F26?logo=html5&logoColor=fff" alt="HTML5"/>
+  <img src="https://img.shields.io/badge/CSS3-1572B6?logo=css3" alt="CSS3"/>
+  <img src="https://img.shields.io/badge/license-MIT-green" alt="MIT License"/>
+</div>
 
 ---
 
