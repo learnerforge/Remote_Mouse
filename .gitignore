@@ -5,6 +5,8 @@ build/
 __pycache__/
 .env
 *.local
-*.log
+events.log
+.tunnel_url
+version_control.md
 .DS_Store
 Thumbs.db

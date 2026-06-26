@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Remote Mouse v1.0.0 - Setup</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;background:#0a0a0a;color:#e0e0e0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif}
+body{display:flex;align-items:center;justify-content:center;padding:20px}
+
+.container{max-width:560px;width:100%}
+.title{font-size:22px;font-weight:700;color:#fff;margin-bottom:4px}
+.sub{font-size:13px;color:#666;margin-bottom:24px}
+
+.card{background:#141414;border:1px solid #222;border-radius:12px;padding:16px;margin-bottom:12px;cursor:pointer;transition:border-color .15s}
+.card:hover{border-color:#333}
+.card.selected{border-color:#4ade80}
+.card h3{font-size:15px;color:#fff;margin-bottom:4px}
+.card p{font-size:12px;color:#888;line-height:1.5}
+.card .badge{display:inline-block;font-size:10px;padding:2px 8px;border-radius:4px;margin-top:6px;font-weight:600}
+.badge-green{background:#166534;color:#4ade80}
+.badge-yellow{background:#713f12;color:#fbbf24}
+.badge-gray{background:#27272a;color:#a1a1aa}
+
+.step{display:none}
+.step.active{display:block}
+
+.email-card{background:#141414;border:1px solid #222;border-radius:12px;padding:16px;margin-bottom:12px}
+.email-card label{font-size:13px;color:#aaa;display:block;margin-bottom:6px}
+.email-card input{width:100%;padding:10px 12px;background:#0a0a0a;border:1px solid #333;border-radius:8px;color:#fff;font-size:14px;outline:none;transition:border-color .15s}
+.email-card input:focus{border-color:#4ade80}
+.email-card input.error{border-color:#ef4444}
+
+.logs-card{background:#0d0d0d;border:1px solid #222;border-radius:12px;padding:12px;margin-bottom:12px;max-height:260px;overflow-y:auto;font-family:'SFMono-Regular',Consolas,'Liberation Mono',Menlo,monospace;font-size:11px;line-height:1.6}
+.logs-card .log-ok{color:#4ade80}
+.logs-card .log-info{color:#666}
+.logs-card .log-warn{color:#fbbf24}
+.logs-card .log-error{color:#ef4444}
+.logs-card .log-cloudflared{color:#818cf8}
+
+.btn{display:inline-flex;align-items:center;gap:8px;padding:12px 24px;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;transition:opacity .15s}
+.btn:hover{opacity:.9}
+.btn-primary{background:#4ade80;color:#052e16}
+.btn-primary:disabled{opacity:.4;cursor:not-allowed}
+.btn-secondary{background:#27272a;color:#e0e0e0}
+.btn-secondary:hover{background:#333}
+
+.spinner{display:inline-block;width:14px;height:14px;border:2px solid #4ade80;border-top-color:transparent;border-radius:50%;animation:spin .6s linear infinite;vertical-align:middle;margin-right:6px}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+.hidden{display:none}
+.flex{display:flex;gap:8px}
+.gap-8{gap:8px}
+.mt-8{margin-top:8px}
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="title">Remote Mouse Setup <span style="font-size:12px;color:#555;font-weight:400">v1.0.0</span></div>
+  <div class="sub">Choose your connection type to get started</div>
+
+  <!-- Step 1: Pick connection case -->
+  <div id="step-1" class="step active">
+    <div class="card" data-case="same-wifi" onclick="pickCase(this)">
+      <h3>Same WiFi Network</h3>
+      <p>Phone and laptop are on the same home/office network. No tunnel needed — just open the local IP address.</p>
+      <span class="badge badge-green">No setup required</span>
+    </div>
+    <div class="card" data-case="remote" onclick="pickCase(this)">
+      <h3>Remote (Different Networks)</h3>
+      <p>Phone is on cellular data or a different WiFi. Requires cloudflared tunnel to expose the server, then email the URL to your phone.</p>
+      <span class="badge badge-yellow">Requires cloudflared + email</span>
+    </div>
+    <div class="card" data-case="localhost" onclick="pickCase(this)">
+      <h3>Localhost (Same Machine)</h3>
+      <p>Testing on this computer. Open the browser on the same laptop where the server runs.</p>
+      <span class="badge badge-gray">No network needed</span>
+    </div>
+    <button id="btn-next" class="btn btn-primary hidden mt-8" onclick="goStep2()">Continue</button>
+  </div>
+
+  <!-- Step 2: Email (only for Remote) + Start -->
+  <div id="step-2" class="step">
+    <div class="email-card">
+      <label for="email-input">Email address to receive the tunnel URL</label>
+      <input id="email-input" type="email" placeholder="you@example.com">
+    </div>
+    <div class="flex gap-8">
+      <button class="btn btn-secondary" onclick="goStep1()">Back</button>
+      <button id="btn-start" class="btn btn-primary" onclick="startSetup()">Start Setup</button>
+    </div>
+  </div>
+
+  <!-- Step 3: Logs + Progress -->
+  <div id="step-3" class="step">
+    <div class="logs-card" id="logs-card">
+      <div style="color:#666">Waiting for setup to begin...</div>
+    </div>
+    <div class="flex gap-8">
+      <button id="btn-redirect" class="btn btn-primary hidden">Open Remote Mouse</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let selectedCase = null;
+
+function pickCase(el) {
+  document.querySelectorAll('.card[data-case]').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  selectedCase = el.dataset.case;
+  document.getElementById('btn-next').classList.remove('hidden');
+}
+
+function goStep1() {
+  document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+  document.getElementById('step-1').classList.add('active');
+}
+
+function goStep2() {
+  document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+  document.getElementById('step-2').classList.add('active');
+  const emailCard = document.getElementById('step-2').querySelector('.email-card');
+  if (selectedCase === 'remote') {
+    emailCard.classList.remove('hidden');
+  } else {
+    emailCard.classList.add('hidden');
+  }
+}
+
+function logLine(text) {
+  const card = document.getElementById('logs-card');
+  const div = document.createElement('div');
+  div.textContent = '> ' + text;
+  if (text.includes('cloudflared')) {
+    div.className = 'log-cloudflared';
+  } else {
+    const m = text.match(/\[.*?\]\s*(\w+)/);
+    if (m) {
+      if (m[1] === 'OK') div.className = 'log-ok';
+      else if (m[1] === 'INFO') div.className = 'log-info';
+      else if (m[1] === 'WARN') div.className = 'log-warn';
+      else if (m[1] === 'ERROR') div.className = 'log-error';
+    }
+  }
+  card.appendChild(div);
+  card.scrollTop = card.scrollHeight;
+}
+
+function showLogsStep() {
+  document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+  document.getElementById('step-3').classList.add('active');
+}
+
+function pollStatus() {
+  fetch('/api/setup-status').then(r => r.json()).then(data => {
+    if (data.logs) {
+      const card = document.getElementById('logs-card');
+      card.innerHTML = '';
+      data.logs.forEach(l => logLine(l));
+    }
+    if (data.done) {
+      const btn = document.getElementById('btn-redirect');
+      btn.classList.remove('hidden');
+      if (data.error) {
+        btn.textContent = 'Retry Setup';
+        btn.onclick = function() { location.reload(); };
+      } else {
+        btn.textContent = 'Open Remote Mouse';
+        btn.onclick = function() { window.location.href = '/'; };
+      }
+      return;
+    }
+    if (data.running) {
+      setTimeout(pollStatus, 1000);
+    }
+  }).catch(() => { setTimeout(pollStatus, 2000); });
+}
+
+function startSetup() {
+  if (!selectedCase) {
+    logLine('ERROR Please select a connection type first.');
+    return;
+  }
+  const email = document.getElementById('email-input') ? document.getElementById('email-input').value.trim() : '';
+  if (selectedCase === 'remote' && (!email || !email.includes('@'))) {
+    document.getElementById('email-input').classList.add('error');
+    return;
+  }
+  document.getElementById('email-input').classList.remove('error');
+  document.getElementById('btn-start').disabled = true;
+  document.getElementById('btn-start').innerHTML = '<span class="spinner"></span> Running...';
+  showLogsStep();
+  fetch('/api/setup-start', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ case: selectedCase, email: email })
+  }).then(r => r.json()).then(data => {
+    if (data.error) {
+      logLine('ERROR ' + data.error);
+      document.getElementById('btn-start').disabled = false;
+      document.getElementById('btn-start').textContent = 'Retry';
+      return;
+    }
+    setTimeout(pollStatus, 500);
+  }).catch(e => {
+    logLine('ERROR Failed to start: ' + e);
+    document.getElementById('btn-start').disabled = false;
+    document.getElementById('btn-start').textContent = 'Retry';
+  });
+}
+</script>
+</body>
+</html>

@@ -30,7 +30,7 @@ try {
 
 # 4. Start Python server
 Write-Host "[...] Starting server..." -ForegroundColor Yellow
-$serverProcess = Start-Process -FilePath "python" -ArgumentList "server.py" -NoNewWindow -PassThru -RedirectStandardOutput "$ProjectRoot\server.log" -RedirectStandardError "$ProjectRoot\server.log"
+$serverProcess = Start-Process -FilePath "python" -ArgumentList "src\server.py" -NoNewWindow -PassThru -RedirectStandardOutput "$ProjectRoot\server.log" -RedirectStandardError "$ProjectRoot\server.log"
 
 Start-Sleep -Seconds 2
 

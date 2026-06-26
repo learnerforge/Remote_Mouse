@@ -29,7 +29,7 @@ fi
 
 # 4. Start Python server
 echo "[...] Starting server..."
-python3 server.py &
+python3 src/server.py &
 SERVER_PID=$!
 sleep 2
 

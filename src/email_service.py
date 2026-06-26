@@ -1,4 +1,6 @@
 import os
+import re
+import sys
 import smtplib
 import ssl
 import time
@@ -7,10 +9,11 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
 DEFAULT_SMTP_PORT = 587
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 def load_env():
     env = {}
-    env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env')
+    env_path = os.path.join(PROJECT_ROOT, '.env')
     if os.path.exists(env_path):
         with open(env_path) as f:
             for line in f:
@@ -37,6 +40,8 @@ def send_email(recipient, subject, body_html):
     msg['From'] = from_addr
     msg['To'] = to_addr
     msg['Subject'] = subject
+    body_text = re.sub(r'<[^>]+>', '', body_html).strip()
+    msg.attach(MIMEText(body_text, 'plain'))
     msg.attach(MIMEText(body_html, 'html'))
 
     context = ssl.create_default_context()
@@ -82,13 +87,21 @@ if __name__ == '__main__':
     parser.add_argument('--test', action='store_true', help='Send a test email')
     args = parser.parse_args()
 
-    if args.send:
-        html = build_url_email(args.send)
-        send_email(None, 'Remote Mouse - Tunnel URL', html)
-        print('Tunnel URL sent via email.')
-    elif args.test:
-        html = '<h2>Test Email</h2><p>If you receive this, SMTP is configured correctly.</p>'
-        send_email(None, 'Remote Mouse - Test Email', html)
-        print('Test email sent.')
-    else:
-        parser.print_help()
+    try:
+        if args.send:
+            html = build_url_email(args.send)
+            send_email(None, 'Remote Mouse - Tunnel URL', html)
+            print('Tunnel URL sent via email.')
+        elif args.test:
+            html = '<h2>Test Email</h2><p>If you receive this, SMTP is configured correctly.</p>'
+            send_email(None, 'Remote Mouse - Test Email', html)
+            print('Test email sent.')
+        else:
+            parser.print_help()
+    except ValueError as e:
+        print(f'ERROR: {e}')
+        print('Hint: Create a .env file from .env.example at the project root.')
+        sys.exit(1)
+    except Exception as e:
+        print(f'ERROR: SMTP sending failed: {e}')
+        sys.exit(1)

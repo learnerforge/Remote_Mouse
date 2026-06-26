@@ -1,4 +1,4 @@
-# AGENTS.md — Remote Mouse
+# AGENTS.md — Remote Mouse v1.0.0
 
 Instructions for LLM coding agents working on this project.
 
@@ -8,7 +8,7 @@ Remote Mouse is a browser-based remote mouse app. The laptop runs everything (Py
 
 ### Stack
 - **Backend:** Python 3.10+, Flask, Flask-SocketIO, pyautogui
-- **Frontend:** Single HTML file, vanilla JS, no build tools
+- **Frontend:** Single HTML files, vanilla JS, no build tools
 - **Tunnel:** cloudflared (optional, for remote access)
 - **Email:** SMTP via `smtplib` (standard library)
 
@@ -17,53 +17,63 @@ Remote Mouse is a browser-based remote mouse app. The laptop runs everything (Py
 Always run these checks after making code changes:
 
 ```bash
-# Syntax check all Python files
-python -m py_compile server.py && python -m py_compile cli.py && python -m py_compile email_service.py
+# From project root
+python -m py_compile src/server.py && python -m py_compile src/cli.py && python -m py_compile src/email_service.py
 ```
 
 ## Run the App
 
 ```bash
-# With REPL control panel (recommended)
-python cli.py
+# With REPL control panel (recommended) — auto-opens setup wizard
+python src/cli.py
 
 # Direct server (no CLI)
-python server.py
+python src/server.py
+```
+
+## Project Structure
+
+```
+Remote_Mouse/
+  src/              Python source
+    server.py         Flask server, WebSocket, REST API, pyautogui, cloudflared
+    cli.py            REPL control panel, subprocess, live logs
+    email_service.py  SMTP sender (importable, also CLI via --send/--test)
+  frontend/         Web frontend
+    index.html        Main mouse control page (touchpad, media, link)
+    setup.html        Setup wizard (3 cases, email, live logs, success)
+    static/
+      socket.io.min.js  Socket.IO client v4.7.5 (49KB, served locally)
+  scripts/          Legacy launchers (advanced users)
+    start.ps1         Windows launcher
+    start.sh          Linux/macOS launcher
+  docs/             Reference documentation
+  .env.example      SMTP config template (copy to .env)
 ```
 
 ## Key Conventions
 
-- **No build step.** The frontend is a single `index.html` with embedded CSS/JS. No npm, webpack, vite.
-- **Local socket.io.** The Socket.IO client (`static/socket.io.min.js`, 49 KB) is served locally, not from CDN. Never revert to CDN — it causes 3+ minute load times on phone hotspot connections.
-- **No authentication.** The server trusts the network. Anyone with the URL can control the mouse.
-- **eventlet is required.** `server.py` uses `eventlet.monkey_patch()` at line 1 and `async_mode='eventlet'` for native WebSocket support. Do not remove eventlet or change the async mode — without it the server falls back to HTTP long-polling only, causing 5-minute load times.
-- **WebSocket-first client.** `index.html` sets `transports: ['websocket', 'polling']` — tries WebSocket instantly, falls back to HTTP long-polling only if WebSocket fails. The polling fallback is instant (same HTTP server that served the page) and the 5s timeout on `io()` guarantees fast fallback.
-- **pyautogui tuning:** Always keep `FAILSAFE = False` and `PAUSE = 0` in `server.py` for zero-latency control.
-- **Logging:** All events go to stdout and `events.log`. The CLI reads stdout via subprocess pipe.
-- **Thread safety:** CLI launches server as a subprocess (`subprocess.Popen`), not a thread. Do not change this to threading.
-
-## Important Files
-
-| File | Purpose |
-|------|---------|
-| `server.py` | Flask server, WebSocket handlers, REST API, pyautogui control |
-| `cli.py` | REPL control panel, subprocess management, live log display |
-| `index.html` | Single-page frontend (touchpad, media controls, link page) |
-| `email_service.py` | SMTP email sender (importable by server.py, also runnable as CLI) |
-| `static/socket.io.min.js` | Local Socket.IO client library |
-| `.env` | SMTP credentials (gitignored) |
+- **No build step.** Frontend is vanilla HTML/CSS/JS. No npm, webpack, vite.
+- **Local socket.io.** Socket.IO client is in `frontend/static/socket.io.min.js`, served locally. Never revert to CDN.
+- **No authentication.** The server trusts the network.
+- **eventlet is required.** `src/server.py` uses `eventlet.monkey_patch()` at line 1 and `async_mode='eventlet'`. Do not remove.
+- **`static_folder=None` is required.** Flask app is created with `Flask(__name__, static_folder=None)`. Without this Flask 3.0's built-in handler intercepts `/static/` requests.
+- **Static files cached 24h.** `Cache-Control: public, max-age=86400` on static files. `index.html` and `setup.html` use `no-cache, must-revalidate`.
+- **socket.io script at end of body.** Not in `<head>`. Page renders before 49KB library downloads.
+- **Favicon route exists.** `/favicon.ico` returns 204 No Content.
+- **WebSocket-first client.** `transports: ['websocket', 'polling']` with 5s fallback.
+- **pyautogui tuning:** Always `FAILSAFE = False` and `PAUSE = 0`.
+- **Logging:** All events go to stdout and `events.log` at project root.
+- **Thread safety:** CLI launches server as a subprocess (`subprocess.Popen`). Do not change to threading.
+- **Setup flow:** `cli.py` starts server, auto-opens browser to `/setup`. Setup wizard offers 3 connection cases. Remote case triggers cloudflared + email.
+- **`events.log` and `.tunnel_url`** are created at project root and gitignored.
 
 ## Common Mistakes to Avoid
 
-- Do NOT add QR code generation — it was explicitly removed per user request
+- Do NOT add QR code generation — explicitly removed per user request
 - Do NOT add CDN links for socket.io — must be served locally
+- Do NOT change file paths without updating all references (PROJECT_ROOT, FRONTEND_DIR)
+- Do NOT remove the `PROJECT_ROOT = os.path.dirname(...)` setup at top of src/*.py — all paths derive from it
 - Do NOT add authentication layers without explicit user request
-- Do NOT add npm/node/build tooling — the project is intentionally build-free
+- Do NOT add npm/node/build tooling
 - Do NOT change the subprocess approach in cli.py (Flask-SocketIO has threading issues)
-
-## Rules
-
-- After editing Python files, always run the syntax check command above
-- After editing HTML/JS, manually verify the page loads in a browser
-- Do NOT introduce new dependencies without checking with the user first
-- Keep changes minimal and focused

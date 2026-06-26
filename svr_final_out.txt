@@ -1,3 +1,0 @@
-[21:16:48] * Server starting on port 5000...
-[21:16:48] * Local:  http://192.168.0.5:5000
-[21:16:48] * WebSocket ready
