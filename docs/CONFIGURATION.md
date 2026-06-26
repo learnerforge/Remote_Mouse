@@ -1,10 +1,30 @@
 # Configuration Reference
 
-This document describes all configuration options for Remote Mouse — environment variables, file paths, server settings, and how to customize behavior.
+**Version:** v1.0.0  
+**Last updated:** 2026-06-26
+
+This document describes every configuration option in Remote Mouse — environment variables, server settings, frontend tunables, file paths, and customization points.
+
+---
+
+## Configuration Loading Order
+
+```mermaid
+graph TD
+    ENV_FILE[".env file<br/>PROJECT_ROOT/.env"] --> CONFIG["Configuration Dict"]
+    ENV_VARS["Environment Variables<br/>SMTP_HOST, SMTP_PORT, etc."] --> CONFIG
+    DEFAULTS["Hardcoded Defaults<br/>server.py, email_service.py"] --> CONFIG
+    CONFIG --> EMAIL["email_service.py"]
+    CONFIG --> SERVER["server.py<br/>(imported via load_env)"]
+```
+
+Values are resolved in order: `.env` file → environment variables → hardcoded defaults.
+
+---
 
 ## Environment Variables (.env)
 
-The `.env` file configures SMTP email delivery. Create it by copying `.env.example`:
+Create by copying `.env.example` at project root:
 
 ```bash
 cp .env.example .env
@@ -15,70 +35,60 @@ cp .env.example .env
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
 | `SMTP_HOST` | Yes | — | SMTP server hostname (e.g., `smtp.gmail.com`) |
-| `SMTP_PORT` | No | `587` | SMTP server port (`587` for STARTTLS, `465` for SSL) |
-| `SMTP_USERNAME` | Yes | — | SMTP authentication username (usually your email) |
-| `SMTP_PASSWORD` | Yes | — | SMTP authentication password or App Password |
-| `SMTP_FROM_EMAIL` | No | same as `SMTP_USERNAME` | The From: address in sent emails |
-| `SMTP_TO_EMAIL` | Yes* | — | Default recipient (your phone email or SMS gateway) |
+| `SMTP_PORT` | No | `587` | SMTP port (`587` STARTTLS, `465` SSL) |
+| `SMTP_USERNAME` | Yes | — | SMTP auth username (usually your email) |
+| `SMTP_PASSWORD` | Yes | — | SMTP password or App Password |
+| `SMTP_FROM_EMAIL` | No | same as `SMTP_USERNAME` | From: address in sent emails |
+| `SMTP_TO_EMAIL` | Yes* | — | Default recipient for CLI `--test` mode |
 
-\* `SMTP_TO_EMAIL` is required when using `email_service.py` from the command line, but when the server sends via the web form (`/api/send-url`), the recipient is provided in the POST request.
+\* `SMTP_TO_EMAIL` required for `--test`; when server sends via `/api/send-url`, recipient comes from POST body.
 
-### Example: Gmail
+### Provider Examples
 
 ```ini
+# Gmail (requires App Password with 2FA enabled)
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
 SMTP_USERNAME=your.name@gmail.com
 SMTP_PASSWORD=xxxx xxxx xxxx xxxx
 SMTP_FROM_EMAIL=your.name@gmail.com
 SMTP_TO_EMAIL=5551234567@vtext.com
-```
 
-### Example: Outlook
-
-```ini
+# Outlook
 SMTP_HOST=smtp-mail.outlook.com
 SMTP_PORT=587
 SMTP_USERNAME=your.name@outlook.com
 SMTP_PASSWORD=your-password
-SMTP_FROM_EMAIL=your.name@outlook.com
-SMTP_TO_EMAIL=your.name@outlook.com
-```
 
-### Example: Yahoo Mail
-
-```ini
+# Yahoo Mail (requires App Password)
 SMTP_HOST=smtp.mail.yahoo.com
 SMTP_PORT=587
 SMTP_USERNAME=your.name@yahoo.com
 SMTP_PASSWORD=your-app-password
-SMTP_FROM_EMAIL=your.name@yahoo.com
-SMTP_TO_EMAIL=your.name@yahoo.com
 ```
 
-## Server Configuration (server.py)
+---
 
-The server has no external configuration file — all settings are defined directly in `server.py`. To customize, edit the file.
+## Server Configuration (`src/server.py`)
 
-### Port
+All server settings are defined directly in `server.py`. No external config file.
+
+### Port and Bind
 
 ```python
-socketio.run(app, host='0.0.0.0', port=5000, ...)
+socketio.run(app, host='0.0.0.0', port=5000, debug=False)
 ```
 
-Change `port=5000` to any available port (e.g., `port=8080`). If you change the port, also update:
-- The cloudflared tunnel command: `cloudflared tunnel --url http://localhost:<new-port>`
-- The startup scripts (start.ps1 and start.sh)
-- The Windows Firewall rule if port changed
+| Parameter | Current Value | Description |
+|-----------|--------------|-------------|
+| `host` | `'0.0.0.0'` | Listen on all interfaces (accessible from LAN). Change to `'127.0.0.1'` for local-only |
+| `port` | `5000` | TCP port. Change if port is in use |
+| `debug` | `False` | Flask debug mode. Enable for development with auto-reload |
 
-### Bind Address
-
-```python
-socketio.run(app, host='0.0.0.0', port=5000, ...)
-```
-
-- `0.0.0.0` — listen on all network interfaces (accessible from other devices)
-- `127.0.0.1` — listen only on localhost (not accessible from other devices)
+**If you change the port**, update:
+1. Startup scripts (`scripts/start.ps1`, `scripts/start.sh`)
+2. Windows Firewall rule
+3. CLI setup URL: `SETUP_URL = 'http://localhost:5000/setup'` in `cli.py`
 
 ### Secret Key
 
@@ -86,9 +96,9 @@ socketio.run(app, host='0.0.0.0', port=5000, ...)
 app.config['SECRET_KEY'] = os.urandom(24).hex()
 ```
 
-The secret key is randomly generated on each server start. It is used by Flask-Session for signing session cookies. Since the server is stateless and there is no authentication, this is not critical for security — it is required by Flask-SocketIO internally.
+Randomly generated on each server start. Used internally by Flask-SocketIO for session signing. Not security-critical since there is no authentication.
 
-### pyautogui Settings
+### pyautogui Tuning
 
 ```python
 pyautogui.FAILSAFE = False
@@ -97,187 +107,261 @@ pyautogui.PAUSE = 0
 
 | Setting | Default | Current | Effect |
 |---------|---------|---------|--------|
-| `FAILSAFE` | `True` | `False` | When True, moving the mouse to a corner raises an exception. Disabled to prevent accidental crashes. |
-| `PAUSE` | `0.1` | `0` | Built-in pause after each pyautogui call. Set to 0 for zero-latency responsiveness. |
+| `FAILSAFE` | `True` | `False` | When True, mouse in corner raises exception. Disabled to prevent crashes |
+| `PAUSE` | `0.1` | `0` | Built-in 100ms delay between calls. Set to 0 for zero latency |
+
+### Socket.IO Options
+
+```python
+socketio = SocketIO(app, async_mode='eventlet', cors_allowed_origins="*",
+                    ping_interval=5, ping_timeout=3)
+```
+
+| Option | Value | Description |
+|--------|-------|-------------|
+| `async_mode` | `'eventlet'` | WebSocket-native async. Must match `eventlet.monkey_patch()` at line 1 |
+| `cors_allowed_origins` | `"*"` | Allow connections from any origin (needed for tunnel access) |
+| `ping_interval` | `5` | Ping every 5 seconds to keep connection alive |
+| `ping_timeout` | `3` | Wait 3 seconds for ping response before disconnecting |
+
+### Cache Control
+
+```python
+# index.html, setup.html — never cache
+resp.headers['Cache-Control'] = 'no-cache, must-revalidate'
+
+# static/* (socket.io.min.js) — cache 24h
+resp.headers['Cache-Control'] = 'public, max-age=86400'
+```
+
+| Route | Cache Policy | Reason |
+|-------|-------------|--------|
+| `/` (index.html) | `no-cache` | Always serve latest frontend |
+| `/setup` (setup.html) | `no-cache` | Always serve latest setup wizard |
+| `/static/*` | `max-age=86400` | socket.io.min.js (49 KB) — cache on phone for 24h |
+
+---
 
 ## File Paths
 
-### Log File
+All paths derive from `PROJECT_ROOT`:
 
 ```python
-EVENT_LOG_FILE = 'events.log'
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# Resolves to: E:\GitHub Projects\Remote_Mouse\
+
+FRONTEND_DIR = os.path.join(PROJECT_ROOT, 'frontend')
+# Resolves to: .../Remote_Mouse/frontend/
+
+STATIC_DIR = os.path.join(FRONTEND_DIR, 'static')
+# Resolves to: .../Remote_Mouse/frontend/static/
 ```
 
-All server events are appended to this file. It is created automatically in the project root. The CLI's `log` command reads from this file.
+### File Reference
 
-**Note:** The log file grows indefinitely. Consider adding log rotation for long-running sessions.
-
-### Tunnel URL File
-
-```python
-TUNNEL_URL_FILE = '.tunnel_url'
+```mermaid
+graph TD
+    ROOT["PROJECT_ROOT<br/>Remote_Mouse/"]
+    ROOT --> SRC["src/<br/>server.py, cli.py, email_service.py"]
+    ROOT --> FRONTEND["frontend/"]
+    ROOT --> DOCS["docs/"]
+    ROOT --> ENV[".env<br/>SMTP config"]
+    ROOT --> LOG["events.log<br/>Runtime log"]
+    ROOT --> TUNNEL[".tunnel_url<br/>Cloudflare URL"]
+    ROOT --> EXAMPLE[".env.example<br/>Template"]
+    FRONTEND --> INDEX["index.html<br/>Main UI"]
+    FRONTEND --> SETUP["setup.html<br/>Wizard"]
+    FRONTEND --> STATIC["static/<br/>socket.io.min.js"]
 ```
 
-The startup scripts write the Cloudflare tunnel URL to this file. The server reads it to expose via the API and WebSocket.
+| Path | Type | Purpose |
+|------|------|---------|
+| `PROJECT_ROOT/.env` | Config | SMTP credentials (gitignored) |
+| `PROJECT_ROOT/.env.example` | Template | Copy to `.env` and fill in |
+| `PROJECT_ROOT/events.log` | Runtime | All server events with timestamps (gitignored) |
+| `PROJECT_ROOT/.tunnel_url` | Runtime | Current cloudflared URL (gitignored) |
+| `PROJECT_ROOT/src/server.py` | Source | Flask + WebSocket + pyautogui |
+| `PROJECT_ROOT/src/cli.py` | Source | REPL control panel |
+| `PROJECT_ROOT/src/email_service.py` | Source | SMTP email sender |
+| `PROJECT_ROOT/frontend/index.html` | Frontend | Main mouse control page |
+| `PROJECT_ROOT/frontend/setup.html` | Frontend | Setup wizard |
+| `PROJECT_ROOT/frontend/static/socket.io.min.js` | Asset | Socket.IO client v4.7.5 (49 KB) |
 
-**Format:** A single line containing the full HTTPS URL.
-**Example content:** `https://abcdefgh123456.trycloudflare.com`
+---
 
-### Static Files Directory
+## Frontend Tunables (`frontend/index.html`)
 
-```python
-# In server.py:
-@app.route('/static/<path:filename>')
-def static_files(filename):
-    return send_from_directory('static', filename)
-```
-
-The `static/` directory contains the local Socket.IO client library (`socket.io.min.js`). You can add other static assets here (icons, images, etc.) and they will be served at `/static/<filename>`.
-
-### index.html
-
-The frontend file must be at the project root. The server serves it at `GET /`:
-
-```python
-@app.route('/')
-def index():
-    return send_file('index.html')
-```
-
-## Frontend Configuration (index.html)
-
-All frontend configuration is inline in `index.html`. Key configurable values:
-
-### Socket.IO Connection Options
-
-```javascript
-const socket = io({
-  transports: ['websocket', 'polling'],
-  reconnection: true,
-  reconnectionAttempts: Infinity,
-  reconnectionDelay: 1000,
-  reconnectionDelayMax: 5000,
-});
-```
+### Socket.IO Connection
 
 | Option | Current Value | Description |
 |--------|---------------|-------------|
-| `transports` | `['websocket', 'polling']` | Prefer WebSocket, fallback to HTTP long-polling |
+| `transports` | `['websocket', 'polling']` | WebSocket first, HTTP fallback |
 | `reconnection` | `true` | Auto-reconnect on disconnect |
-| `reconnectionAttempts` | `Infinity` | Never give up reconnecting |
-| `reconnectionDelay` | `1000` | Initial delay before first reconnection (ms) |
-| `reconnectionDelayMax` | `5000` | Maximum delay between reconnection attempts (ms) |
+| `reconnectionAttempts` | `Infinity` | Never stop reconnecting |
+| `reconnectionDelay` | `1000` | Initial delay before first retry (ms) |
+| `reconnectionDelayMax` | `5000` | Max delay between retries (ms) |
 
-### Sensitivity Range
+### Sensitivity Slider
 
 ```html
 <input type="range" id="sens-slider" min="0.2" max="3.0" step="0.1" value="1.0">
 ```
 
-| Attribute | Current Value | Description |
-|-----------|---------------|-------------|
-| `min` | `0.2` | Minimum sensitivity (0.2x = very slow) |
-| `max` | `3.0` | Maximum sensitivity (3.0x = very fast) |
+| Attribute | Value | Description |
+|-----------|-------|-------------|
+| `min` | `0.2` | Slowest cursor speed |
+| `max` | `3.0` | Fastest cursor speed |
 | `step` | `0.1` | Granularity of adjustment |
-| `value` | `1.0` | Default sensitivity |
+| `value` | `1.0` | Default (no multiplier) |
 
 ### Tap Threshold
 
 ```javascript
-if (e.changedTouches.length === 1 && !touchMoved && Date.now() - touchStartTime < 400) {
+if (Date.now() - touchStartTime < 400) { /* tap detected */ }
 ```
 
-The `400` is the maximum duration in milliseconds for a touch to be considered a tap (click). Adjust to make taps more or less forgiving:
-- Lower values (e.g., `200`): Only very quick touches register as clicks
-- Higher values (e.g., `600`): Slower touches also register as clicks
+| Constant | Location | Effect |
+|----------|----------|--------|
+| `400` | touchpad touchend handler | Max ms for a touch to count as a tap |
 
-### Movement Threshold
+Lower (e.g., `200`): only very quick touches click. Higher (e.g., `600`): slow touches also click.
+
+### Movement Dead Zone
 
 ```javascript
-if (Math.abs(dx) > 1 || Math.abs(dy) > 1) {
+if (Math.abs(dx) > 1 || Math.abs(dy) > 1) { /* send move event */ }
 ```
 
-The `1` is the minimum pixel movement required to trigger a mouse move event. Increase to reduce jitter (at the cost of precision).
+| Value | Effect |
+|-------|--------|
+| `1` px | Ignore sub-1px jitter. Increase to 3–5 for noisier screens |
 
 ### Drag Mode Multiplier
 
 ```javascript
-if (dragMode) {
-  socket.emit('mouse_move', { dx: dx * sensitivity * 1.2, dy: dy * sensitivity * 1.2 });
-}
+// Drag mode applies 1.2x extra multiplier
+socket.emit('mouse_move', { dx: dx * sensitivity * 1.2, dy: dy * sensitivity * 1.2 });
 ```
 
-The `1.2` multiplier in drag mode makes cursor movement slightly faster during drag operations. This compensates for the fact that dragging across the screen typically requires larger cursor movements.
+| Value | Location | Effect |
+|-------|----------|--------|
+| `1.2` | touchmove handler when dragMode=true | Makes dragging slightly faster for cross-screen selections |
 
-## Startup Scripts
+### Two-Finger Scroll Sensitivity
 
-### start.ps1 (Windows)
+The scroll delta calculation in `server.py`:
 
-The PowerShell script has these configurable values at the top:
+```python
+clicks = max(1, abs(int(dy / 20)))
+```
+
+| Value | Effect |
+|-------|--------|
+| `20` | Pixels per scroll notch. Lower = more sensitive (fewer pixels per notch) |
+
+---
+
+## Network Configuration
+
+### Connection Modes
+
+```mermaid
+graph TD
+    subgraph Setup["Setup Wizard Connection Cases"]
+        LOCAL["Localhost<br/>Same machine"]
+        SAME["Same WiFi<br/>Local network"]
+        REMOTE["Remote<br/>Different networks"]
+    end
+
+    subgraph Required["Setup Steps"]
+        LOCAL_R["Open http://127.0.0.1:5000"]
+        SAME_R["Open http://{local_ip}:5000<br/>Firewall must allow port 5000"]
+        REMOTE_R["cloudflared tunnel<br/>Email URL to phone"]
+    end
+
+    LOCAL --> LOCAL_R
+    SAME --> SAME_R
+    REMOTE --> REMOTE_R
+```
+
+### Firewall Rule (Windows)
 
 ```powershell
-$ProjectRoot = Split-Path -Parent $PSScriptRoot
-```
+# Verify rule exists
+netsh advfirewall firewall show rule name="Remote Mouse 5000"
 
-All other settings are derived automatically. No manual configuration needed for basic use.
+# Add rule (if missing)
+netsh advfirewall firewall add rule name="Remote Mouse 5000" dir=in action=allow protocol=TCP localport=5000
 
-### start.sh (Linux/macOS)
-
-```bash
-PROJECT_ROOT=$(pwd)
-```
-
-Same — fully automatic.
-
-## Windows Firewall Rule
-
-If you change the port, update the firewall rule:
-
-```powershell
-# Delete old rule
+# Delete and recreate with new port
 netsh advfirewall firewall delete rule name="Remote Mouse 5000"
-
-# Add new rule with new port
 netsh advfirewall firewall add rule name="Remote Mouse 5000" dir=in action=allow protocol=TCP localport=8080
 ```
 
-## Cloudflare Tunnel
+### Static IP (Optional)
 
-### Custom Domain (Advanced)
+Set a static IP to avoid URL changes on every boot:
 
-By default, cloudflared generates a random `*.trycloudflare.com` URL. To use a custom domain:
+**Windows:** Settings > Network & Internet > WiFi > Hardware properties > Edit IP assignment > Manual > On
+- IP: Outside DHCP range (e.g., `10.0.0.100`)
+- Subnet: `255.255.255.0`
+- Gateway: Router IP
+- DNS: `8.8.8.8` / `1.1.1.1`
 
-1. Install and authenticate cloudflared: `cloudflared tunnel login`
-2. Create a tunnel with a name: `cloudflared tunnel create my-mouse`
-3. Configure DNS to point your domain to the tunnel
-4. Run: `cloudflared tunnel run my-mouse`
+---
 
-This is beyond the scope of basic setup — see the [Cloudflare Tunnel documentation](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/) for details.
+## CLI Configuration (`src/cli.py`)
 
-### Tunnel Logging
+| Setting | Value | Description |
+|---------|-------|-------------|
+| `SETUP_URL` | `'http://localhost:5000/setup'` | Auto-opened in browser on CLI start |
+| `EVENT_LOG_FILE` | `ProjectRoot/events.log` | Path to log file for `log` command |
+| `TUNNEL_URL_FILE` | `ProjectRoot/.tunnel_url` | Path to tunnel URL for `status` command |
+| Color coding | Green=OK, Yellow=WARN, Red=ERROR | Applied by `colorize()` based on prefix |
 
-cloudflared writes logs to `tunnel.log` in the project root when started by the launcher scripts. Check this file if the tunnel fails to start.
+---
+
+## Startup Scripts
+
+### Windows (`scripts/start.ps1`)
+
+```powershell
+$ProjectRoot = Split-Path -Parent $PSScriptRoot
+# All other paths derive from $ProjectRoot
+```
+
+### Linux/macOS (`scripts/start.sh`)
+
+```bash
+PROJECT_ROOT=$(dirname "$(dirname "$0")")
+cd "$PROJECT_ROOT" || exit 1
+```
+
+---
+
+## Version-Specific Config
+
+### v1.0.0 — DPI Presets (Current)
+
+| Feature | Config Point | Default | Location |
+|---------|-------------|---------|----------|
+| DPI preset buttons | 400, 800, 1600, 3200 | Added to click bar | `frontend/index.html` |
+| DPI label | Shows "400 DPI" etc. next to preset | In settings panel | `frontend/index.html` |
+| Sensitivity–DPI mapping | `base_dpi = 800` | Server-side conversion | `src/server.py` |
+
+---
 
 ## Events Log
 
-The `events.log` file is auto-created in the project root. It contains all server events with timestamps:
+Auto-created at `PROJECT_ROOT/events.log`. All server events with timestamps:
 
 ```
-[19:30:22] * Server starting on port 5000...
-[19:30:22] * Local:  http://10.0.0.5:5000
-[19:31:05] * Client connected
-[19:31:12] > move   (+0045, -0023)
+[19:30:22] OK Server starting on port 5000...
+[19:30:22] INFO Local: http://10.0.0.5:5000
+[19:31:05] OK Client connected
+[19:31:12] INFO move   (+0045, -0023)
+[19:31:14] OK click  left
+[19:31:18] INFO scroll (+00120)
 ```
 
-The CLI's `log` command reads the last 50 lines from this file. The file grows without rotation — for long sessions, consider periodically clearing it or adding log rotation.
-
-## Troubleshooting Configuration
-
-| Symptom | Likely Cause | Fix |
-|---------|-------------|-----|
-| Email not sending | SMTP credentials wrong | Test with `python email_service.py --test` |
-| Tunnel URL not showing | cloudflared not started | Check `.tunnel_url` exists and has content |
-| Server won't bind to port | Port in use | Change port in `server.py` |
-| Phone can't connect (local) | Firewall blocking | Check Windows Firewall rule |
-| Phone can't connect (remote) | Tunnel not running | Check cloudflared is installed and started |
-| JavaScript errors on phone | Old browser | Use Chrome, Edge, or Safari (latest versions) |
+**Note:** Grows without rotation. Clear periodically or add log rotation for long sessions.
