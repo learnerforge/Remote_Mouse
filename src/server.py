@@ -3,7 +3,6 @@ eventlet.monkey_patch()
 
 import os
 import re
-import queue
 import subprocess
 import socket as sock_lib
 import threading
@@ -127,42 +126,44 @@ def start_cloudflared():
         setup_state['error'] = 'cloudflared not found'
         return None
     setup_log("INFO Starting cloudflared tunnel...")
-    proc = subprocess.Popen(
-        [cf, 'tunnel', '--url', 'http://localhost:5000'],
-        stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-        text=True, bufsize=1
-    )
+
+    tmp_path = os.path.join(PROJECT_ROOT, '.cloudflared_output')
+    cmd = f'"{cf}" tunnel --url http://localhost:5000 > "{tmp_path}" 2>&1'
+    proc = subprocess.Popen(cmd, shell=True)
     cloudflared_proc = proc
-    line_queue = queue.Queue()
-
-    def reader():
-        for line in iter(proc.stdout.readline, ''):
-            line_queue.put(line)
-        line_queue.put(None)
-
-    threading.Thread(target=reader, daemon=True).start()
 
     url = None
     deadline = 30
     start = datetime.now()
     while (datetime.now() - start).total_seconds() < deadline:
         try:
-            line = line_queue.get(timeout=0.5)
-            if line is None:
-                break
-            line = line.rstrip('\n\r')
-            if line:
-                setup_log(f"cloudflared {line[:120]}")
-            m = re.search(r'https?://[a-zA-Z0-9.-]+\.trycloudflare\.com', line)
-            if m:
-                url = m.group(0)
-                setup_log(f"OK Tunnel URL: {url}")
-                break
-        except queue.Empty:
-            if proc.poll() is not None:
-                setup_log("ERROR cloudflared exited unexpectedly")
-                setup_state['error'] = 'cloudflared exited'
-                return None
+            if os.path.exists(tmp_path):
+                with open(tmp_path, encoding='utf-8', errors='replace') as f:
+                    for line in f:
+                        line = line.rstrip('\n\r')
+                        if line:
+                            setup_log(f"cloudflared {line[:120]}")
+                        m = re.search(r'https?://[a-zA-Z0-9.-]+\.trycloudflare\.com', line)
+                        if m:
+                            url = m.group(0)
+                            setup_log(f"OK Tunnel URL: {url}")
+                            break
+                if url:
+                    break
+        except (IOError, OSError):
+            pass
+
+        if proc.poll() is not None:
+            setup_log("ERROR cloudflared exited unexpectedly")
+            setup_state['error'] = 'cloudflared exited'
+            try: os.unlink(tmp_path)
+            except: pass
+            return None
+
+        time.sleep(0.5)
+
+    try: os.unlink(tmp_path)
+    except: pass
 
     if not url:
         setup_log("ERROR cloudflared timed out (30s) — no tunnel URL received")
@@ -231,7 +232,6 @@ def api_setup_start():
                 setup_log(f"INFO Open http://{ip}:5000 on your phone")
             elif case == 'remote':
                 setup_log("OK Case: Remote (different networks)")
-                setup_log("INFO Starting cloudflared tunnel...")
                 url = start_cloudflared()
                 if url:
                     ip = get_local_ip()

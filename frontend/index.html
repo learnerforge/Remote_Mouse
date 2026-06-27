@@ -38,13 +38,39 @@ html,body{height:100%;overflow:hidden;background:#0a0a0a;color:#fff;font-family:
 /* Media page */
 #media-page{align-items:center;justify-content:center;gap:20px;padding:20px}
 #media-page .row{display:flex;gap:16px;align-items:center;justify-content:center}
-#media-page button{border:none;border-radius:50%;background:#1a1a1a;color:#fff;width:64px;height:64px;font-size:24px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .1s}
-#media-page button:active{background:#333}
+#media-page button{
+  border:none;border-radius:50%;background:#1a1a1a;color:#fff;
+  width:64px;height:64px;font-size:24px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  touch-action:manipulation;
+  transition:transform .12s cubic-bezier(.34,1.56,.64,1),background .15s,box-shadow .15s;
+  will-change:transform;-webkit-tap-highlight-color:transparent
+}
+#media-page button:active{transform:scale(.88);background:#333}
 #media-page .big{width:80px;height:80px;font-size:32px;background:#4ade80;color:#000}
-#media-page .big:active{background:#22c55e}
+#media-page .big:active{transform:scale(.85);background:#22c55e}
 #media-page .vol-row{width:100%;max-width:320px;display:flex;gap:12px;align-items:center;justify-content:center;margin-top:8px}
-#media-page .vol-row button{width:52px;height:52px;font-size:18px}
+#media-page .vol-row button{width:52px;height:52px;font-size:18px;box-shadow:0 0 0 0 rgba(74,222,128,0)}
 #media-page .label{font-size:11px;color:#555;text-align:center;margin-top:2px}
+
+/* Play/Pause crossfade flip */
+#media-play{position:relative}
+#media-play .pw{display:flex;align-items:center;justify-content:center;width:100%;height:100%}
+#media-play .pi,#media-play .pa{transition:opacity .25s,transform .3s cubic-bezier(.34,1.56,.64,1);position:absolute}
+#media-play .pa{opacity:0;transform:scale(.4)}
+#media-play.playing .pi{opacity:0;transform:scale(.4)}
+#media-play.playing .pa{opacity:1;transform:scale(1)}
+
+/* Mute toggle crossfade */
+#media-mute{position:relative}
+#media-mute .mu,#media-mute .mm{transition:opacity .25s,transform .28s cubic-bezier(.34,1.56,.64,1);position:absolute}
+#media-mute .mm{opacity:0;transform:scale(.3) rotate(-25deg)}
+#media-mute.muted .mu{opacity:0;transform:scale(.3) rotate(25deg)}
+#media-mute.muted .mm{opacity:1;transform:scale(1) rotate(0)}
+
+/* Volume button ring pulse */
+@keyframes vring{to{box-shadow:0 0 0 18px rgba(74,222,128,0)}}
+.vol-row button:active{animation:vring .35s ease-out}
 
 /* Link page */
 #link-page{align-items:center;padding:24px 20px;gap:16px}
@@ -108,12 +134,12 @@ html,body{height:100%;overflow:hidden;background:#0a0a0a;color:#fff;font-family:
   <div class="page" id="media-page">
     <div class="row">
       <div><button id="media-prev">⏮</button><div class="label">Previous</div></div>
-      <div><button class="big" id="media-play">▶</button><div class="label">Play/Pause</div></div>
+      <div><button class="big" id="media-play"><span class="pw"><span class="pi">▶</span><span class="pa">⏸</span></span></button><div class="label">Play/Pause</div></div>
       <div><button id="media-next">⏭</button><div class="label">Next</div></div>
     </div>
     <div class="vol-row">
       <button id="media-vol-down">🔉</button>
-      <button id="media-mute">🔊</button>
+      <button id="media-mute"><span class="mu">🔊</span><span class="mm">🔇</span></button>
       <button id="media-vol-up">🔊</button>
     </div>
   </div>
@@ -386,17 +412,28 @@ dragToggle.addEventListener('click', () => {
 });
 
 /* --- Media Controls --- */
+let isPlaying = false;
+let isMuted = false;
+
 function mediaAction(action) {
   socket.emit('media', { action });
   navigator.vibrate && navigator.vibrate(10);
 }
 
-document.getElementById('media-play').addEventListener('click', () => mediaAction('play_pause'));
+document.getElementById('media-play').addEventListener('click', () => {
+  isPlaying = !isPlaying;
+  document.getElementById('media-play').classList.toggle('playing', isPlaying);
+  mediaAction('play_pause');
+});
 document.getElementById('media-next').addEventListener('click', () => mediaAction('next'));
 document.getElementById('media-prev').addEventListener('click', () => mediaAction('prev'));
 document.getElementById('media-vol-up').addEventListener('click', () => mediaAction('vol_up'));
 document.getElementById('media-vol-down').addEventListener('click', () => mediaAction('vol_down'));
-document.getElementById('media-mute').addEventListener('click', () => mediaAction('mute'));
+document.getElementById('media-mute').addEventListener('click', () => {
+  isMuted = !isMuted;
+  document.getElementById('media-mute').classList.toggle('muted', isMuted);
+  mediaAction('mute');
+});
 
 /* --- Bottom Nav --- */
 document.getElementById('bottom-nav').addEventListener('click', (e) => {
