@@ -5,53 +5,100 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Remote Mouse v1.0.0</title>
 <style>
+:root{
+  --bg:#0a0a0a;--bg2:#0d0d0d;--bg3:#111;--bg4:#1a1a1a;
+  --border:#1a1a1a;--border2:#222;
+  --text:#fff;--text2:#666;--text3:#888;--text4:#555;--text5:#333;--text6:#444;
+  --accent:#4ade80;--accent2:#22c55e;--danger:#f87171;
+  --drag-bg:#141414;--drag-on-bg:#1a2a1a;--mode-border:#2a4a2a;--disabled-bg:#1a4a2a;
+  --glow:rgba(74,222,128,.35);--glow2:rgba(74,222,128,.15);--glow3:rgba(74,222,128,.6);--glow4:rgba(74,222,128,.03);--glow5:rgba(74,222,128,.025);--glow6:rgba(74,222,128,0);--glow7:rgba(74,222,128,.4)
+}
+:root.light{
+  --bg:#e8e8e8;--bg2:#ffffff;--bg3:#eeeeee;--bg4:#d5d5d5;
+  --border:#c8c8c8;--border2:#b0b0b0;
+  --text:#222;--text2:#666;--text3:#888;--text4:#999;--text5:#bbb;--text6:#999;
+  --accent:#22c55e;--accent2:#16a34a;--danger:#ef4444;
+  --drag-bg:#e0e0e0;--drag-on-bg:#dcfce7;--mode-border:#86efac;--disabled-bg:#bbf7d0;
+  --glow:rgba(34,197,94,.25);--glow2:rgba(34,197,94,.12);--glow3:rgba(34,197,94,.5);--glow4:rgba(34,197,94,.05);--glow5:rgba(34,197,94,.04);--glow6:rgba(34,197,94,0);--glow7:rgba(34,197,94,.3)
+}
 *{margin:0;padding:0;box-sizing:border-box}
-html,body{height:100%;overflow:hidden;background:#0a0a0a;color:#fff;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
 #app{display:flex;flex-direction:column;height:100%}
 
 /* Status bar */
-#status-bar{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;font-size:12px;color:#666;background:#0d0d0d;border-bottom:1px solid #1a1a1a;min-height:44px}
-#status-bar .dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:8px;background:#555}
-#status-bar .dot.on{background:#4ade80;box-shadow:0 0 6px rgba(74,222,128,.4)}
-#status-ip{color:#444}
+#status-bar{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;font-size:12px;color:var(--text2);background:var(--bg2);border-bottom:1px solid var(--border);min-height:44px}
+#status-bar .dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:8px;background:var(--text4)}
+#status-bar .dot.on{background:var(--accent);box-shadow:0 0 6px var(--glow7)}
+#status-ip{color:var(--text6)}
+#theme-btn{cursor:pointer;font-size:15px;color:var(--text3);background:none;border:none;padding:0 2px;line-height:1;touch-action:manipulation}
 
 /* Pages */
 .page{display:none;flex:1;flex-direction:column}
 .page.active{display:flex}
 
 /* Touchpad page */
-#touchpad{flex:1;display:flex;align-items:center;justify-content:center;touch-action:none;cursor:default;position:relative}
-#touchpad.dim{background:#0d0d0d}
-#touchpad-label{font-size:13px;color:#333;pointer-events:none;transition:opacity .3s}
+#touchpad{flex:1;display:flex;align-items:center;justify-content:center;touch-action:none;cursor:default;position:relative;overflow:hidden;background-image:radial-gradient(circle at 25% 40%,var(--glow4) 0%,transparent 50%),radial-gradient(circle at 75% 60%,var(--glow5) 0%,transparent 50%)}
+#touchpad.dim{background:var(--bg2)}
+#touchpad-label{font-size:13px;color:var(--text5);pointer-events:none;transition:opacity .3s;position:relative;z-index:1}
 #touchpad.dim #touchpad-label{opacity:0}
-#scroll-zone{position:absolute;right:0;top:0;bottom:0;width:36px;background:rgba(255,255,255,.02);display:flex;align-items:center;justify-content:center;font-size:11px;color:#333}
+#scroll-zone{position:absolute;right:0;top:0;bottom:0;width:36px;background:rgba(128,128,128,.03);display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--text5)}
+
+/* Touch cursor */
+#touch-cursor{position:absolute;pointer-events:none;z-index:5;width:44px;height:44px;border-radius:50%;background:radial-gradient(circle,var(--glow) 0%,transparent 70%);border:1.5px solid var(--glow2);transform:translate(-50%,-50%);opacity:0;transition:opacity .1s ease}
+#touch-cursor.show{opacity:1}
+
+/* Tap ripple */
+@keyframes t-ripple{0%{transform:translate(-50%,-50%) scale(0);opacity:.6}100%{transform:translate(-50%,-50%) scale(4);opacity:0}}
+#tap-ripple{position:absolute;pointer-events:none;z-index:4;width:20px;height:20px;border-radius:50%;border:2.5px solid var(--glow3);transform:translate(-50%,-50%);opacity:0}
+#tap-ripple.go{animation:t-ripple .35s ease-out forwards;opacity:1}
+
+/* Long-press ring */
+@keyframes l-ring{0%{transform:translate(-50%,-50%) scale(0);opacity:.5}100%{transform:translate(-50%,-50%) scale(2);opacity:0}}
+#long-ring{position:absolute;pointer-events:none;z-index:4;width:28px;height:28px;border-radius:50%;border:3px solid var(--danger);transform:translate(-50%,-50%);opacity:0}
+#long-ring.go{animation:l-ring .4s ease-out forwards;opacity:1}
+
+/* Scroll indicator */
+#scroll-ind{position:absolute;right:10px;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;align-items:center;gap:2px;font-size:12px;color:var(--accent);opacity:0;transition:opacity .2s;pointer-events:none;z-index:3;line-height:1}
+#scroll-ind.show{opacity:1}
+@keyframes sb0{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
+@keyframes sb1{0%,100%{transform:translateY(0)}50%{transform:translateY(3px)}}
+#scroll-ind .u{animation:sb0 .5s ease-in-out infinite;display:block}
+#scroll-ind .d{animation:sb1 .5s ease-in-out infinite;display:block}
 
 /* Click bar */
-#click-bar{display:flex;padding:6px 8px;gap:6px;background:#0d0d0d;border-top:1px solid #1a1a1a}
-#click-bar button{flex:1;padding:14px 0;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;background:#1a1a1a;color:#fff;transition:background .1s}
-#click-bar button{touch-action:manipulation}
-#click-bar button:active{background:#333}
-#click-bar .left{color:#4ade80}
-#click-bar .right{color:#f87171}
-#click-bar .drag-btn{flex:0 0 52px;font-size:18px;color:#888;background:#141414}
+#click-bar{display:flex;padding:6px 8px;gap:6px;background:var(--bg2);border-top:1px solid var(--border)}
+#click-bar button{flex:1;padding:14px 0;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;background:var(--bg4);color:var(--text);touch-action:manipulation;transition:transform .1s cubic-bezier(.34,1.56,.64,1),background .1s}
+#click-bar button:active{transform:scale(.96);background:var(--text5)}
+#click-bar .left{color:var(--accent)}
+#click-bar .right{color:var(--danger)}
+#click-bar .drag-btn{flex:0 0 52px;font-size:18px;color:var(--text3);background:var(--drag-bg)}
+#click-bar .drag-btn.on{color:var(--accent);background:var(--drag-on-bg);box-shadow:0 0 8px var(--glow2)}
+
+/* Mode toggle */
+#mode-toggle{display:flex;gap:0;padding:6px 16px;background:var(--bg2);border-bottom:1px solid var(--border);align-items:center}
+.mode-btn{flex:1;padding:7px;border:1px solid var(--border2);background:var(--bg3);color:var(--text4);font-size:12px;cursor:pointer;transition:all .15s;text-align:center;touch-action:manipulation}
+.mode-btn:first-child{border-radius:8px 0 0 8px}
+.mode-btn:last-child{border-radius:0 8px 8px 0}
+.mode-btn.active{background:var(--drag-on-bg);color:var(--accent);border-color:var(--mode-border)}
+#mode-indicator{font-size:10px;color:var(--text4);margin-left:8px;white-space:nowrap}
 
 /* Media page */
 #media-page{align-items:center;justify-content:center;gap:20px;padding:20px}
 #media-page .row{display:flex;gap:16px;align-items:center;justify-content:center}
 #media-page button{
-  border:none;border-radius:50%;background:#1a1a1a;color:#fff;
+  border:none;border-radius:50%;background:var(--bg4);color:var(--text);
   width:64px;height:64px;font-size:24px;cursor:pointer;
   display:flex;align-items:center;justify-content:center;
   touch-action:manipulation;
   transition:transform .12s cubic-bezier(.34,1.56,.64,1),background .15s,box-shadow .15s;
   will-change:transform;-webkit-tap-highlight-color:transparent
 }
-#media-page button:active{transform:scale(.88);background:#333}
-#media-page .big{width:80px;height:80px;font-size:32px;background:#4ade80;color:#000}
-#media-page .big:active{transform:scale(.85);background:#22c55e}
+#media-page button:active{transform:scale(.88);background:var(--text5)}
+#media-page .big{width:80px;height:80px;font-size:32px;background:var(--accent);color:#000}
+#media-page .big:active{transform:scale(.85);background:var(--accent2)}
 #media-page .vol-row{width:100%;max-width:320px;display:flex;gap:12px;align-items:center;justify-content:center;margin-top:8px}
-#media-page .vol-row button{width:52px;height:52px;font-size:18px;box-shadow:0 0 0 0 rgba(74,222,128,0)}
-#media-page .label{font-size:11px;color:#555;text-align:center;margin-top:2px}
+#media-page .vol-row button{width:52px;height:52px;font-size:18px;box-shadow:0 0 0 0 var(--glow6)}
+#media-page .label{font-size:11px;color:var(--text4);text-align:center;margin-top:2px}
 
 /* Play/Pause crossfade flip */
 #media-play{position:relative}
@@ -69,57 +116,69 @@ html,body{height:100%;overflow:hidden;background:#0a0a0a;color:#fff;font-family:
 #media-mute.muted .mm{opacity:1;transform:scale(1) rotate(0)}
 
 /* Volume button ring pulse */
-@keyframes vring{to{box-shadow:0 0 0 18px rgba(74,222,128,0)}}
+@keyframes vring{to{box-shadow:0 0 0 18px var(--glow6)}}
 .vol-row button:active{animation:vring .35s ease-out}
 
 /* Link page */
 #link-page{align-items:center;padding:24px 20px;gap:16px}
-#link-page .card{width:100%;max-width:360px;background:#111;border:1px solid #1a1a1a;border-radius:12px;padding:20px}
-#link-page .card h3{font-size:14px;color:#888;margin-bottom:8px;font-weight:400}
-#link-page .card .url{font-size:12px;color:#4ade80;word-break:break-all;padding:10px;background:#0a0a0a;border-radius:8px;line-height:1.5;margin-bottom:6px}
-#link-page .card .copy-btn{font-size:11px;color:#666;background:none;border:none;cursor:pointer;padding:4px 0}
-#link-page .card .copy-btn:active{color:#4ade80}
-#link-page .divider{width:100%;max-width:360px;display:flex;align-items:center;gap:12px;color:#333;font-size:11px}
-#link-page .divider::before,#link-page .divider::after{content:'';flex:1;height:1px;background:#1a1a1a}
+#link-page .card{width:100%;max-width:360px;background:var(--bg3);border:1px solid var(--border);border-radius:12px;padding:20px}
+#link-page .card h3{font-size:14px;color:var(--text3);margin-bottom:8px;font-weight:400}
+#link-page .card .url{font-size:12px;color:var(--accent);word-break:break-all;padding:10px;background:var(--bg);border-radius:8px;line-height:1.5;margin-bottom:6px}
+#link-page .card .copy-btn{font-size:11px;color:var(--text2);background:none;border:none;cursor:pointer;padding:4px 0}
+#link-page .card .copy-btn:active{color:var(--accent)}
+#link-page .divider{width:100%;max-width:360px;display:flex;align-items:center;gap:12px;color:var(--text5);font-size:11px}
+#link-page .divider::before,#link-page .divider::after{content:'';flex:1;height:1px;background:var(--border)}
 #link-page .email-form{width:100%;max-width:360px;display:flex;flex-direction:column;gap:10px}
-#link-page .email-form input{width:100%;padding:14px 16px;border-radius:10px;border:1px solid #222;background:#111;color:#fff;font-size:14px;outline:none;box-sizing:border-box}
-#link-page .email-form input:focus{border-color:#4ade80}
-#link-page .email-form input::placeholder{color:#555}
-#link-page .email-form button{width:100%;padding:14px;border:none;border-radius:10px;background:#4ade80;color:#000;font-size:15px;font-weight:600;cursor:pointer;transition:opacity .15s}
+#link-page .email-form input{width:100%;padding:14px 16px;border-radius:10px;border:1px solid var(--border2);background:var(--bg3);color:var(--text);font-size:14px;outline:none;box-sizing:border-box}
+#link-page .email-form input:focus{border-color:var(--accent)}
+#link-page .email-form input::placeholder{color:var(--text4)}
+#link-page .email-form button{width:100%;padding:14px;border:none;border-radius:10px;background:var(--accent);color:#000;font-size:15px;font-weight:600;cursor:pointer;transition:opacity .15s}
 #link-page .email-form button:active{opacity:.7}
-#link-page .email-form button:disabled{background:#1a4a2a;color:#555}
+#link-page .email-form button:disabled{background:var(--disabled-bg);color:var(--text4)}
 #link-page .msg{font-size:12px;text-align:center;padding:4px 0;min-height:20px}
-#link-page .msg.ok{color:#4ade80}
-#link-page .msg.err{color:#f87171}
-#link-page .msg.wait{color:#888}
+#link-page .msg.ok{color:var(--accent)}
+#link-page .msg.err{color:var(--danger)}
+#link-page .msg.wait{color:var(--text3)}
 
 /* Bottom nav */
-#bottom-nav{display:flex;border-top:1px solid #1a1a1a;background:#0d0d0d;padding-bottom:env(safe-area-inset-bottom)}
-#bottom-nav button{flex:1;padding:10px 0 8px;background:none;border:none;color:#555;font-size:11px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px;transition:color .2s}
+#bottom-nav{display:flex;border-top:1px solid var(--border);background:var(--bg2);padding-bottom:env(safe-area-inset-bottom)}
+#bottom-nav button{flex:1;padding:10px 0 8px;background:none;border:none;color:var(--text4);font-size:11px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px;transition:color .2s}
 #bottom-nav button .icon{font-size:20px;line-height:1}
-#bottom-nav button.active{color:#4ade80}
+#bottom-nav button.active{color:var(--accent)}
 
 /* Sensitivity panel */
-#sens-panel{position:fixed;bottom:0;left:0;right:0;background:#111;border-top:1px solid #222;padding:16px 20px;padding-bottom:calc(16px + env(safe-area-inset-bottom));transform:translateY(100%);transition:transform .3s;z-index:10}
+#sens-panel{position:fixed;bottom:0;left:0;right:0;background:var(--bg3);border-top:1px solid var(--border2);padding:16px 20px;padding-bottom:calc(16px + env(safe-area-inset-bottom));transform:translateY(100%);transition:transform .3s;z-index:10}
 #sens-panel.open{transform:translateY(0)}
 #sens-panel .header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
-#sens-panel .header span{font-size:13px;color:#888}
-#sens-panel .header button{background:none;border:none;color:#4ade80;font-size:14px;cursor:pointer}
-#sens-panel input[type=range]{width:100%;-webkit-appearance:none;appearance:none;height:4px;border-radius:2px;background:#333;outline:none}
-#sens-panel input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:20px;height:20px;border-radius:50%;background:#4ade80;cursor:pointer}
-#sens-panel input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;background:#4ade80;cursor:pointer;border:none}
+#sens-panel .header span{font-size:13px;color:var(--text3)}
+#sens-panel .header button{background:none;border:none;color:var(--accent);font-size:14px;cursor:pointer}
+#sens-panel input[type=range]{width:100%;-webkit-appearance:none;appearance:none;height:4px;border-radius:2px;background:var(--text5);outline:none}
+#sens-panel input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:20px;height:20px;border-radius:50%;background:var(--accent);cursor:pointer}
+#sens-panel input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;background:var(--accent);cursor:pointer;border:none}
 </style>
 </head>
 <body>
 <div id="app">
   <div id="status-bar">
     <span><span class="dot" id="status-dot"></span><span id="status-text">Connecting...</span></span>
-    <span id="status-ip"></span>
+    <span style="display:flex;align-items:center;gap:8px">
+      <span id="status-ip"></span>
+      <span id="theme-btn">☾</span>
+    </span>
   </div>
 
   <!-- Touchpad Page -->
   <div class="page active" id="touchpad-page">
+    <div id="mode-toggle">
+      <button class="mode-btn active" data-mode="touchpad">Touchpad</button>
+      <button class="mode-btn" data-mode="mouse">Mouse</button>
+      <span id="mode-indicator">relative</span>
+    </div>
     <div id="touchpad">
+      <div id="touch-cursor"></div>
+      <div id="tap-ripple"></div>
+      <div id="long-ring"></div>
+      <div id="scroll-ind"><span class="u">▲</span><span>━</span><span class="d">▼</span></div>
       <span id="touchpad-label">Touch & drag to move</span>
       <div id="scroll-zone">↕</div>
     </div>
@@ -138,9 +197,9 @@ html,body{height:100%;overflow:hidden;background:#0a0a0a;color:#fff;font-family:
       <div><button id="media-next">⏭</button><div class="label">Next</div></div>
     </div>
     <div class="vol-row">
-      <button id="media-vol-down">🔉</button>
-      <button id="media-mute"><span class="mu">🔊</span><span class="mm">🔇</span></button>
-      <button id="media-vol-up">🔊</button>
+      <button id="media-vol-down">▾</button>
+      <button id="media-mute"><span class="mu">○</span><span class="mm">⊘</span></button>
+      <button id="media-vol-up">▴</button>
     </div>
   </div>
 
@@ -149,7 +208,7 @@ html,body{height:100%;overflow:hidden;background:#0a0a0a;color:#fff;font-family:
     <div class="card">
       <h3>Your Tunnel Link</h3>
       <div class="url" id="tunnel-url-display">Waiting for tunnel...</div>
-      <button class="copy-btn" id="copy-url">📋 Copy to clipboard</button>
+      <button class="copy-btn" id="copy-url">⊕ Copy to clipboard</button>
     </div>
 
     <div class="divider">or email it to your phone</div>
@@ -163,10 +222,10 @@ html,body{height:100%;overflow:hidden;background:#0a0a0a;color:#fff;font-family:
 
   <!-- Bottom Nav -->
   <div id="bottom-nav">
-    <button class="active" data-page="touchpad-page"><span class="icon">🖱</span>Touchpad</button>
-    <button data-page="media-page"><span class="icon">🎵</span>Media</button>
-    <button data-page="link-page"><span class="icon">🔗</span>Link</button>
-    <button id="settings-btn"><span class="icon">⚙</span></button>
+    <button class="active" data-page="touchpad-page"><span class="icon">⌇</span>Touchpad</button>
+    <button data-page="media-page"><span class="icon">♪</span>Media</button>
+    <button data-page="link-page"><span class="icon">⊕</span>Link</button>
+    <button id="settings-btn"><span class="icon">☰</span></button>
   </div>
 
   <!-- Sensitivity Panel -->
@@ -204,6 +263,9 @@ let touches = {};
 let lastPos = null;
 let touchStartTime = 0;
 let touchMoved = false;
+let longTimer = null;
+let longFired = false;
+let scrollTimeout = null;
 let tunnelUrl = '';
 
 const tunnelUrlDisplay = document.getElementById('tunnel-url-display');
@@ -211,6 +273,29 @@ const copyBtn = document.getElementById('copy-url');
 const emailInput = document.getElementById('email-input');
 const sendBtn = document.getElementById('send-email-btn');
 const emailMsg = document.getElementById('email-msg');
+const touchCursor = document.getElementById('touch-cursor');
+const tapRipple = document.getElementById('tap-ripple');
+const longRing = document.getElementById('long-ring');
+const scrollInd = document.getElementById('scroll-ind');
+const modeBtnContainer = document.getElementById('mode-toggle');
+const modeBtns = modeBtnContainer.querySelectorAll('.mode-btn');
+const modeIndicator = document.getElementById('mode-indicator');
+const themeBtn = document.getElementById('theme-btn');
+
+let mode = 'touchpad';
+
+/* --- Theme --- */
+if (localStorage.getItem('theme') === 'light') {
+  document.documentElement.classList.add('light');
+  themeBtn.textContent = '☀';
+}
+themeBtn.addEventListener('click', () => {
+  const isLight = document.documentElement.classList.toggle('light');
+  themeBtn.textContent = isLight ? '☀' : '☾';
+  localStorage.setItem('theme', isLight ? 'light' : 'dark');
+});
+let screenW = 1920;
+let screenH = 1080;
 
 socket.on('connect', () => {
   statusDot.className = 'dot on';
@@ -239,6 +324,8 @@ socket.on('connect_error', (err) => {
 
 socket.on('screen_info', (data) => {
   if (data.ip) statusIp.textContent = data.ip;
+  if (data.width) screenW = data.width;
+  if (data.height) screenH = data.height;
   if (data.tunnel_url) updateTunnelUrl(data.tunnel_url);
 });
 
@@ -249,7 +336,6 @@ socket.on('tunnel_url', (data) => {
 function updateTunnelUrl(url) {
   tunnelUrl = url;
   tunnelUrlDisplay.textContent = url;
-  tunnelUrlDisplay.style.color = '#4ade80';
 }
 
 /* --- Fetch tunnel URL from REST API as fallback --- */
@@ -262,7 +348,7 @@ copyBtn.addEventListener('click', () => {
   if (!tunnelUrl) return;
   navigator.clipboard.writeText(tunnelUrl).then(() => {
     copyBtn.textContent = '✓ Copied!';
-    setTimeout(() => { copyBtn.textContent = '📋 Copy to clipboard'; }, 2000);
+    setTimeout(() => { copyBtn.textContent = '⊕ Copy to clipboard'; }, 2000);
   }).catch(() => {
     const ta = document.createElement('textarea');
     ta.value = tunnelUrl;
@@ -270,8 +356,8 @@ copyBtn.addEventListener('click', () => {
     ta.select();
     document.execCommand('copy');
     document.body.removeChild(ta);
-    copyBtn.textContent = '✓ Copied!';
-    setTimeout(() => { copyBtn.textContent = '📋 Copy to clipboard'; }, 2000);
+    copyBtn.textContent = '/ Copied!';
+    setTimeout(() => { copyBtn.textContent = '⊕ Copy to clipboard'; }, 2000);
   });
 });
 
@@ -312,10 +398,24 @@ sendBtn.addEventListener('click', () => {
   });
 });
 
+/* --- Mode Toggle --- */
+modeBtnContainer.addEventListener('click', (e) => {
+  const btn = e.target.closest('.mode-btn');
+  if (!btn) return;
+  mode = btn.dataset.mode;
+  modeBtns.forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+  modeIndicator.textContent = mode === 'touchpad' ? 'relative' : 'absolute';
+  document.getElementById('touchpad-label').textContent = mode === 'touchpad' ? 'Touch & drag to move' : 'Touch screen to position cursor';
+  dragToggle.style.display = mode === 'touchpad' ? '' : 'none';
+  touchpad.classList.remove('dim');
+  touchCursor.classList.remove('show');
+});
+
 /* --- Touchpad Logic --- */
 touchpad.addEventListener('touchstart', (e) => {
   e.preventDefault();
   touchpad.classList.add('dim');
+  longFired = false;
 
   for (const t of e.changedTouches) {
     touches[t.identifier] = { lastX: t.clientX, lastY: t.clientY };
@@ -326,6 +426,30 @@ touchpad.addEventListener('touchstart', (e) => {
     lastPos = { x: t.clientX, y: t.clientY };
     touchStartTime = Date.now();
     touchMoved = false;
+
+    const rect = touchpad.getBoundingClientRect();
+    touchCursor.style.left = (t.clientX - rect.left) + 'px';
+    touchCursor.style.top = (t.clientY - rect.top) + 'px';
+    touchCursor.classList.add('show');
+
+    if (mode === 'mouse') {
+      const rx = (t.clientX - rect.left) / rect.width;
+      const ry = (t.clientY - rect.top) / rect.height;
+      socket.emit('mouse_abs', { x: Math.round(rx * screenW), y: Math.round(ry * screenH) });
+      return;
+    }
+
+    longTimer = setTimeout(() => {
+      longFired = true;
+      const r = touchpad.getBoundingClientRect();
+      longRing.style.left = (t.clientX - r.left) + 'px';
+      longRing.style.top = (t.clientY - r.top) + 'px';
+      longRing.classList.remove('go');
+      void longRing.offsetHeight;
+      longRing.classList.add('go');
+      socket.emit('click', { button: 'right' });
+      navigator.vibrate && navigator.vibrate(15);
+    }, 500);
   }
 });
 
@@ -335,6 +459,17 @@ touchpad.addEventListener('touchmove', (e) => {
 
   if (count === 1) {
     const t = e.touches[0];
+    const rect = touchpad.getBoundingClientRect();
+    touchCursor.style.left = (t.clientX - rect.left) + 'px';
+    touchCursor.style.top = (t.clientY - rect.top) + 'px';
+
+    if (mode === 'mouse') {
+      const rx = (t.clientX - rect.left) / rect.width;
+      const ry = (t.clientY - rect.top) / rect.height;
+      socket.emit('mouse_abs', { x: Math.round(rx * screenW), y: Math.round(ry * screenH) });
+      return;
+    }
+
     const touch = touches[t.identifier];
     if (touch && lastPos) {
       let dx = t.clientX - lastPos.x;
@@ -342,6 +477,7 @@ touchpad.addEventListener('touchmove', (e) => {
 
       if (Math.abs(dx) > 1 || Math.abs(dy) > 1) {
         touchMoved = true;
+        if (longTimer) { clearTimeout(longTimer); longTimer = null; }
         if (dragMode) {
           socket.emit('mouse_move', { dx: dx * sensitivity * 1.2, dy: dy * sensitivity * 1.2 });
         } else {
@@ -351,6 +487,9 @@ touchpad.addEventListener('touchmove', (e) => {
       lastPos = { x: t.clientX, y: t.clientY };
     }
   } else if (count === 2) {
+    touchCursor.classList.remove('show');
+    if (longTimer) { clearTimeout(longTimer); longTimer = null; }
+
     const t1 = e.touches[0];
     const t2 = e.touches[1];
     const prev1 = touches[t1.identifier];
@@ -360,6 +499,9 @@ touchpad.addEventListener('touchmove', (e) => {
       const avgDy = ((t1.clientY - prev1.lastY) + (t2.clientY - prev2.lastY)) / 2;
       if (Math.abs(avgDy) > 5) {
         socket.emit('scroll', { dy: avgDy * 2 });
+        scrollInd.classList.add('show');
+        if (scrollTimeout) clearTimeout(scrollTimeout);
+        scrollTimeout = setTimeout(() => scrollInd.classList.remove('show'), 800);
       }
     }
 
@@ -375,7 +517,26 @@ touchpad.addEventListener('touchend', (e) => {
     delete touches[t.identifier];
   }
 
-  if (e.changedTouches.length === 1 && !touchMoved && Date.now() - touchStartTime < 400) {
+  if (longTimer) { clearTimeout(longTimer); longTimer = null; }
+
+  if (mode === 'mouse' && e.changedTouches.length === 1) {
+    const t = e.changedTouches[0];
+    const rect = touchpad.getBoundingClientRect();
+    tapRipple.style.left = (t.clientX - rect.left) + 'px';
+    tapRipple.style.top = (t.clientY - rect.top) + 'px';
+    tapRipple.classList.remove('go');
+    void tapRipple.offsetHeight;
+    tapRipple.classList.add('go');
+    socket.emit('click', { button: 'left' });
+    navigator.vibrate && navigator.vibrate(10);
+  } else if (e.changedTouches.length === 1 && !touchMoved && !longFired && Date.now() - touchStartTime < 300) {
+    const t = e.changedTouches[0];
+    const rect = touchpad.getBoundingClientRect();
+    tapRipple.style.left = (t.clientX - rect.left) + 'px';
+    tapRipple.style.top = (t.clientY - rect.top) + 'px';
+    tapRipple.classList.remove('go');
+    void tapRipple.offsetHeight;
+    tapRipple.classList.add('go');
     socket.emit('click', { button: 'left' });
     navigator.vibrate && navigator.vibrate(10);
   }
@@ -384,6 +545,7 @@ touchpad.addEventListener('touchend', (e) => {
     touchpad.classList.remove('dim');
     lastPos = null;
     touchMoved = false;
+    touchCursor.classList.remove('show');
   }
 });
 
@@ -392,6 +554,8 @@ touchpad.addEventListener('touchcancel', (e) => {
   touchpad.classList.remove('dim');
   lastPos = null;
   touchMoved = false;
+  touchCursor.classList.remove('show');
+  if (longTimer) { clearTimeout(longTimer); longTimer = null; }
 });
 
 /* --- Click Buttons --- */
@@ -405,8 +569,8 @@ document.getElementById('click-bar').addEventListener('pointerdown', (e) => {
 
 dragToggle.addEventListener('click', () => {
   dragMode = !dragMode;
+  dragToggle.classList.toggle('on', dragMode);
   dragToggle.dataset.drag = dragMode ? '1' : '0';
-  dragToggle.style.color = dragMode ? '#4ade80' : '#888';
   dragToggle.textContent = dragMode ? '⊟' : '⊞';
   navigator.vibrate && navigator.vibrate(10);
 });

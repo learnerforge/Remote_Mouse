@@ -314,6 +314,13 @@ def handle_move(data):
         pyautogui.moveRel(int(dx), int(dy), _pause=False)
         log_info(f"move ({dx:+04}, {dy:+04})")
 
+@socketio.on('mouse_abs')
+def handle_mouse_abs(data):
+    x = data.get('x', 0)
+    y = data.get('y', 0)
+    pyautogui.moveTo(x, y, _pause=False)
+    log_info(f"abs  ({x:04}, {y:04})")
+
 @socketio.on('click')
 def handle_click(data):
     button = data.get('button', 'left')
