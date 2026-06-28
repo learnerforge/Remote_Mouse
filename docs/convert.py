@@ -1,7 +1,8 @@
-"""Convert docs/*.md to docs/*.html with navigation template."""
+"""Convert wiki/*.md to docs/*.html with navigation template."""
 import os, re, html as html_mod
 
 DOCS = os.path.dirname(os.path.abspath(__file__))
+WIKI = os.path.join(os.path.dirname(DOCS), 'wiki')
 CSS = '../css/style.css'
 
 NAV_ITEMS = [
@@ -206,7 +207,8 @@ def convert_file(md_path, title):
         nav_items.append(f'<li><a href="{path}"{active}>{label}</a></li>')
     nav_html = '\n'.join(nav_items)
 
-    html_path = md_path.replace('.md', '.html')
+    out_name = os.path.basename(md_path).replace('.md', '.html')
+    html_path = os.path.join(DOCS, out_name)
     html = TEMPLATE.format(
         title=html_mod.escape(title),
         css=CSS,
@@ -220,15 +222,14 @@ def convert_file(md_path, title):
 
 if __name__ == '__main__':
     files = [
-        ('README_FULL.md', 'Home'),
+        ('index.md', 'Home'),
         ('ARCHITECTURE.md', 'Architecture'),
-        ('CONFIGURATION.md', 'Configuration'),
-        ('PROTOCOL.md', 'Protocol'),
-        ('TROUBLESHOOTING.md', 'Troubleshooting'),
-        ('COMPARISON.md', 'Comparison'),
+        ('SETUP.md', 'Setup'),
+        ('DEVELOPMENT.md', 'Development'),
+        ('FAQ.md', 'FAQ'),
     ]
     for md, title in files:
-        path = os.path.join(DOCS, md)
+        path = os.path.join(WIKI, md)
         if os.path.exists(path):
             convert_file(path, title)
     print('Done.')

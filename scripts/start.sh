@@ -88,5 +88,11 @@ echo ""
 echo "Press Ctrl+C to stop."
 echo ""
 
-trap "kill $SERVER_PID ${TUNNEL_PID:-} 2>/dev/null; exit" INT TERM
+cleanup() {
+  kill "$SERVER_PID" 2>/dev/null
+  [ -n "${TUNNEL_PID:-}" ] && kill "$TUNNEL_PID" 2>/dev/null
+  rm -f "$PROJECT_ROOT/.tunnel_url"
+  exit
+}
+trap cleanup INT TERM
 wait

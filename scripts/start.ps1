@@ -48,7 +48,7 @@ if ($hasCloudflared) {
   Write-Host "[...] Starting Cloudflare tunnel..." -ForegroundColor Yellow
 
   $tunnelLog = "$ProjectRoot\tunnel.log"
-  $tunnelProcess = Start-Process -FilePath "cloudflared" -ArgumentList "tunnel --url http://localhost:5000 --logfile $tunnelLog" -NoNewWindow -PassThru
+  $tunnelProcess = Start-Process -FilePath "cloudflared" -ArgumentList @("tunnel", "--url", "http://localhost:5000", "--logfile", $tunnelLog) -NoNewWindow -PassThru
 
   Write-Host "[...] Waiting for tunnel URL..." -ForegroundColor Yellow
   $urlFound = $false

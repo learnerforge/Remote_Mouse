@@ -105,6 +105,7 @@ body{display:flex;align-items:center;justify-content:center;padding:20px}
 
 <script>
 let selectedCase = null;
+let savedEmail = '';
 
 function pickCase(el) {
   document.querySelectorAll('.card[data-case]').forEach(c => c.classList.remove('selected'));
@@ -124,6 +125,7 @@ function goStep2() {
   const emailCard = document.getElementById('step-2').querySelector('.email-card');
   if (selectedCase === 'remote') {
     emailCard.classList.remove('hidden');
+    document.getElementById('email-input').value = savedEmail;
   } else {
     emailCard.classList.add('hidden');
   }
@@ -165,7 +167,7 @@ function pollStatus() {
       btn.classList.remove('hidden');
       if (data.error) {
         btn.textContent = 'Retry Setup';
-        btn.onclick = function() { location.reload(); };
+        btn.onclick = function() { retrySetup(); };
       } else {
         btn.textContent = 'Open Remote Mouse';
         btn.onclick = function() { window.location.href = '/'; };
@@ -184,6 +186,7 @@ function startSetup() {
     return;
   }
   const email = document.getElementById('email-input') ? document.getElementById('email-input').value.trim() : '';
+  savedEmail = email;
   if (selectedCase === 'remote' && (!email || !email.includes('@'))) {
     document.getElementById('email-input').classList.add('error');
     return;
@@ -209,6 +212,12 @@ function startSetup() {
     document.getElementById('btn-start').disabled = false;
     document.getElementById('btn-start').textContent = 'Retry';
   });
+}
+
+function retrySetup() {
+  goStep2();
+  document.getElementById('btn-start').disabled = false;
+  document.getElementById('btn-start').innerHTML = 'Start Setup';
 }
 </script>
 </body>

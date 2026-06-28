@@ -6,6 +6,7 @@ import re
 import subprocess
 import socket as sock_lib
 import threading
+import time
 import atexit
 from datetime import datetime
 from collections import deque
@@ -120,6 +121,11 @@ def start_cloudflared():
         except subprocess.TimeoutExpired:
             cloudflared_proc.kill()
         cloudflared_proc = None
+
+    # Clear stale tunnel URL before starting fresh
+    try: os.unlink(TUNNEL_URL_FILE)
+    except FileNotFoundError: pass
+
     cf = find_cloudflared()
     if not cf:
         setup_log("ERROR cloudflared not found. Install from https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/")
@@ -128,16 +134,44 @@ def start_cloudflared():
     setup_log("INFO Starting cloudflared tunnel...")
 
     tmp_path = os.path.join(PROJECT_ROOT, '.cloudflared_output')
-    cmd = f'"{cf}" tunnel --url http://localhost:5000 > "{tmp_path}" 2>&1'
-    proc = subprocess.Popen(cmd, shell=True)
+    # Use direct file handle (not PIPE) to avoid eventlet GreenPipe deadlock on Windows
+    with open(tmp_path, 'w', encoding='utf-8') as out:
+        proc = subprocess.Popen(
+            [cf, 'tunnel', '--url', 'http://localhost:5000'],
+            stdout=out, stderr=subprocess.STDOUT,
+            creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0
+        )
     cloudflared_proc = proc
 
     url = None
     deadline = 30
     start = datetime.now()
     while (datetime.now() - start).total_seconds() < deadline:
-        try:
+        if proc.poll() is not None:
+            # cloudflared exited — read whatever we got
             if os.path.exists(tmp_path):
+                with open(tmp_path, encoding='utf-8', errors='replace') as f:
+                    for line in f:
+                        line = line.rstrip('\n\r')
+                        if line:
+                            setup_log(f"cloudflared {line[:120]}")
+                        m = re.search(r'https?://[a-zA-Z0-9.-]+\.trycloudflare\.com', line)
+                        if m:
+                            url = m.group(0)
+                            setup_log(f"OK Tunnel URL: {url}")
+                            break
+            if not url:
+                setup_log("ERROR cloudflared exited before providing a tunnel URL")
+                setup_state['error'] = 'cloudflared exited'
+            try: os.unlink(tmp_path)
+            except: pass
+            if url:
+                with open(TUNNEL_URL_FILE, 'w') as f:
+                    f.write(url + '\n')
+            return url
+
+        if os.path.exists(tmp_path):
+            try:
                 with open(tmp_path, encoding='utf-8', errors='replace') as f:
                     for line in f:
                         line = line.rstrip('\n\r')
@@ -150,15 +184,8 @@ def start_cloudflared():
                             break
                 if url:
                     break
-        except (IOError, OSError):
-            pass
-
-        if proc.poll() is not None:
-            setup_log("ERROR cloudflared exited unexpectedly")
-            setup_state['error'] = 'cloudflared exited'
-            try: os.unlink(tmp_path)
-            except: pass
-            return None
+            except (IOError, OSError):
+                pass
 
         time.sleep(0.5)
 
@@ -316,8 +343,9 @@ def handle_move(data):
 
 @socketio.on('mouse_abs')
 def handle_mouse_abs(data):
-    x = data.get('x', 0)
-    y = data.get('y', 0)
+    w, h = pyautogui.size()
+    x = max(0, min(w, int(data.get('x', 0))))
+    y = max(0, min(h, int(data.get('y', 0))))
     pyautogui.moveTo(x, y, _pause=False)
     log_info(f"abs  ({x:04}, {y:04})")
 
@@ -329,11 +357,16 @@ def handle_click(data):
 
 @socketio.on('scroll')
 def handle_scroll(data):
+    dx = data.get('dx', 0)
     dy = data.get('dy', 0)
     if dy != 0:
         clicks = max(1, abs(int(dy / 20)))
         pyautogui.scroll(-clicks if dy > 0 else clicks, _pause=False)
-        log_info(f"scroll ({dy:+05})")
+        log_info(f"scroll v({dy:+05})")
+    if dx != 0:
+        clicks = max(1, abs(int(dx / 20)))
+        pyautogui.hscroll(clicks if dx > 0 else -clicks, _pause=False)
+        log_info(f"scroll h({dx:+05})")
 
 @socketio.on('media')
 def handle_media(data):
@@ -352,6 +385,10 @@ def handle_media(data):
         log_info(f"media {action}")
 
 def run_server():
+    # Clear stale tunnel URL from previous session
+    try: os.unlink(TUNNEL_URL_FILE)
+    except FileNotFoundError: pass
+
     ip = get_local_ip()
     tunnel = get_tunnel_url()
     log_ok("Remote Mouse v1.0.0 starting on port 5000...")

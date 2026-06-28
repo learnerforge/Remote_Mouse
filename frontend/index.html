@@ -64,6 +64,11 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
 @keyframes sb1{0%,100%{transform:translateY(0)}50%{transform:translateY(3px)}}
 #scroll-ind .u{animation:sb0 .5s ease-in-out infinite;display:block}
 #scroll-ind .d{animation:sb1 .5s ease-in-out infinite;display:block}
+#scroll-ind .l,#scroll-ind .r{display:none}
+#scroll-ind.h .u,#scroll-ind.h .d{display:none}
+#scroll-ind.h .l{animation:sb0 .5s ease-in-out infinite;display:block}
+#scroll-ind.h .r{animation:sb1 .5s ease-in-out infinite;display:block}
+#scroll-ind.h .m{display:none}
 
 /* Click bar */
 #click-bar{display:flex;padding:6px 8px;gap:6px;background:var(--bg2);border-top:1px solid var(--border)}
@@ -178,7 +183,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
       <div id="touch-cursor"></div>
       <div id="tap-ripple"></div>
       <div id="long-ring"></div>
-      <div id="scroll-ind"><span class="u">▲</span><span>━</span><span class="d">▼</span></div>
+      <div id="scroll-ind"><span class="u">▲</span><span class="m">━</span><span class="d">▼</span><span class="l">◄</span><span class="r">►</span></div>
       <span id="touchpad-label">Touch & drag to move</span>
       <div id="scroll-zone">↕</div>
     </div>
@@ -262,10 +267,13 @@ let dragMode = false;
 let touches = {};
 let lastPos = null;
 let touchStartTime = 0;
+let lastMoveTime = 0;
 let touchMoved = false;
 let longTimer = null;
 let longFired = false;
 let scrollTimeout = null;
+let lastTapTime = 0;
+let twoFingerCount = 0;
 let tunnelUrl = '';
 
 const tunnelUrlDisplay = document.getElementById('tunnel-url-display');
@@ -407,25 +415,69 @@ modeBtnContainer.addEventListener('click', (e) => {
   modeIndicator.textContent = mode === 'touchpad' ? 'relative' : 'absolute';
   document.getElementById('touchpad-label').textContent = mode === 'touchpad' ? 'Touch & drag to move' : 'Touch screen to position cursor';
   dragToggle.style.display = mode === 'touchpad' ? '' : 'none';
-  touchpad.classList.remove('dim');
-  touchCursor.classList.remove('show');
+  resetTouchState();
 });
 
 /* --- Touchpad Logic --- */
+function absPos(t) {
+  if (!screenW || !screenH) return;
+  const rect = touchpad.getBoundingClientRect();
+  if (!rect.width || !rect.height) return;
+  const rx = Math.max(0, Math.min(1, (t.clientX - rect.left) / rect.width));
+  const ry = Math.max(0, Math.min(1, (t.clientY - rect.top) / rect.height));
+  socket.emit('mouse_abs', { x: Math.round(rx * screenW), y: Math.round(ry * screenH) });
+}
+
+function resetTouchState() {
+  touchpad.classList.remove('dim');
+  lastPos = null;
+  touchMoved = false;
+  touchCursor.classList.remove('show');
+  if (longTimer) { clearTimeout(longTimer); longTimer = null; }
+}
+
+function moveCursor(dx, dy) {
+  const now = Date.now();
+  let factor = sensitivity;
+  const dt = now - lastMoveTime;
+  if (dt > 0 && dt < 100) {
+    const speed = Math.sqrt(dx * dx + dy * dy) / dt;
+    const accel = Math.min(4, 1 + speed * 0.12);
+    factor *= accel;
+  }
+  lastMoveTime = now;
+  if (dragMode) factor *= 1.2;
+  socket.emit('mouse_move', { dx: Math.round(dx * factor), dy: Math.round(dy * factor) });
+}
+
+function doTap(x, y, button) {
+  tapRipple.style.left = x + 'px';
+  tapRipple.style.top = y + 'px';
+  tapRipple.classList.remove('go');
+  void tapRipple.offsetHeight;
+  tapRipple.classList.add('go');
+  socket.emit('click', { button });
+  navigator.vibrate && navigator.vibrate(button === 'right' ? 15 : 10);
+}
+
 touchpad.addEventListener('touchstart', (e) => {
   e.preventDefault();
   touchpad.classList.add('dim');
-  longFired = false;
 
   for (const t of e.changedTouches) {
     touches[t.identifier] = { lastX: t.clientX, lastY: t.clientY };
   }
 
-  if (e.touches.length === 1) {
+  const count = e.touches.length;
+
+  if (count === 1) {
     const t = e.changedTouches[0];
     lastPos = { x: t.clientX, y: t.clientY };
-    touchStartTime = Date.now();
+    lastMoveTime = Date.now();
+    touchStartTime = lastMoveTime;
     touchMoved = false;
+    longFired = false;
+    twoFingerCount = 0;
 
     const rect = touchpad.getBoundingClientRect();
     touchCursor.style.left = (t.clientX - rect.left) + 'px';
@@ -433,23 +485,11 @@ touchpad.addEventListener('touchstart', (e) => {
     touchCursor.classList.add('show');
 
     if (mode === 'mouse') {
-      const rx = (t.clientX - rect.left) / rect.width;
-      const ry = (t.clientY - rect.top) / rect.height;
-      socket.emit('mouse_abs', { x: Math.round(rx * screenW), y: Math.round(ry * screenH) });
-      return;
+      absPos(t);
     }
-
-    longTimer = setTimeout(() => {
-      longFired = true;
-      const r = touchpad.getBoundingClientRect();
-      longRing.style.left = (t.clientX - r.left) + 'px';
-      longRing.style.top = (t.clientY - r.top) + 'px';
-      longRing.classList.remove('go');
-      void longRing.offsetHeight;
-      longRing.classList.add('go');
-      socket.emit('click', { button: 'right' });
-      navigator.vibrate && navigator.vibrate(15);
-    }, 500);
+  } else if (count === 2) {
+    twoFingerCount = 2;
+    if (longTimer) { clearTimeout(longTimer); longTimer = null; }
   }
 });
 
@@ -464,27 +504,22 @@ touchpad.addEventListener('touchmove', (e) => {
     touchCursor.style.top = (t.clientY - rect.top) + 'px';
 
     if (mode === 'mouse') {
-      const rx = (t.clientX - rect.left) / rect.width;
-      const ry = (t.clientY - rect.top) / rect.height;
-      socket.emit('mouse_abs', { x: Math.round(rx * screenW), y: Math.round(ry * screenH) });
+      absPos(t);
+      lastPos = { x: t.clientX, y: t.clientY };
+      touches[t.identifier] = { lastX: t.clientX, lastY: t.clientY };
       return;
     }
 
-    const touch = touches[t.identifier];
-    if (touch && lastPos) {
+    if (lastPos) {
       let dx = t.clientX - lastPos.x;
       let dy = t.clientY - lastPos.y;
 
       if (Math.abs(dx) > 1 || Math.abs(dy) > 1) {
         touchMoved = true;
-        if (longTimer) { clearTimeout(longTimer); longTimer = null; }
-        if (dragMode) {
-          socket.emit('mouse_move', { dx: dx * sensitivity * 1.2, dy: dy * sensitivity * 1.2 });
-        } else {
-          socket.emit('mouse_move', { dx: dx * sensitivity, dy: dy * sensitivity });
-        }
+        moveCursor(dx, dy);
       }
       lastPos = { x: t.clientX, y: t.clientY };
+      touches[t.identifier] = { lastX: t.clientX, lastY: t.clientY };
     }
   } else if (count === 2) {
     touchCursor.classList.remove('show');
@@ -496,10 +531,13 @@ touchpad.addEventListener('touchmove', (e) => {
     const prev2 = touches[t2.identifier];
 
     if (prev1 && prev2) {
+      const avgDx = ((t1.clientX - prev1.lastX) + (t2.clientX - prev2.lastX)) / 2;
       const avgDy = ((t1.clientY - prev1.lastY) + (t2.clientY - prev2.lastY)) / 2;
-      if (Math.abs(avgDy) > 5) {
-        socket.emit('scroll', { dy: avgDy * 2 });
+      if (Math.abs(avgDx) > 5 || Math.abs(avgDy) > 5) {
+        touchMoved = true;
+        socket.emit('scroll', { dx: Math.round(avgDx * 2), dy: Math.round(avgDy * 2) });
         scrollInd.classList.add('show');
+        scrollInd.classList.toggle('h', Math.abs(avgDx) > Math.abs(avgDy));
         if (scrollTimeout) clearTimeout(scrollTimeout);
         scrollTimeout = setTimeout(() => scrollInd.classList.remove('show'), 800);
       }
@@ -517,45 +555,41 @@ touchpad.addEventListener('touchend', (e) => {
     delete touches[t.identifier];
   }
 
-  if (longTimer) { clearTimeout(longTimer); longTimer = null; }
+  const remaining = Object.keys(touches).length;
+  const now = Date.now();
 
-  if (mode === 'mouse' && e.changedTouches.length === 1) {
+  if (mode === 'mouse' && e.changedTouches.length === 1 && !touchMoved) {
     const t = e.changedTouches[0];
     const rect = touchpad.getBoundingClientRect();
-    tapRipple.style.left = (t.clientX - rect.left) + 'px';
-    tapRipple.style.top = (t.clientY - rect.top) + 'px';
-    tapRipple.classList.remove('go');
-    void tapRipple.offsetHeight;
-    tapRipple.classList.add('go');
-    socket.emit('click', { button: 'left' });
-    navigator.vibrate && navigator.vibrate(10);
-  } else if (e.changedTouches.length === 1 && !touchMoved && !longFired && Date.now() - touchStartTime < 300) {
+    doTap(t.clientX - rect.left, t.clientY - rect.top, 'left');
+  } else if (e.changedTouches.length === 2 && twoFingerCount === 2 && !touchMoved) {
+    const rect = touchpad.getBoundingClientRect();
+    const t = e.changedTouches[0];
+    doTap(t.clientX - rect.left, t.clientY - rect.top, 'right');
+  } else if (e.changedTouches.length === 1 && !touchMoved && !longFired && now - touchStartTime < 300) {
     const t = e.changedTouches[0];
     const rect = touchpad.getBoundingClientRect();
-    tapRipple.style.left = (t.clientX - rect.left) + 'px';
-    tapRipple.style.top = (t.clientY - rect.top) + 'px';
-    tapRipple.classList.remove('go');
-    void tapRipple.offsetHeight;
-    tapRipple.classList.add('go');
-    socket.emit('click', { button: 'left' });
-    navigator.vibrate && navigator.vibrate(10);
+
+    if (now - lastTapTime < 350) {
+      // Second tap → double click (doTap sends 1 click per tap = 2 total)
+      doTap(t.clientX - rect.left, t.clientY - rect.top, 'left');
+      lastTapTime = 0;
+    } else {
+      lastTapTime = now;
+      doTap(t.clientX - rect.left, t.clientY - rect.top, 'left');
+    }
   }
 
-  if (Object.keys(touches).length === 0) {
-    touchpad.classList.remove('dim');
-    lastPos = null;
-    touchMoved = false;
-    touchCursor.classList.remove('show');
+  if (remaining === 0) {
+    twoFingerCount = 0;
+    resetTouchState();
   }
 });
 
-touchpad.addEventListener('touchcancel', (e) => {
+touchpad.addEventListener('touchcancel', () => {
   touches = {};
-  touchpad.classList.remove('dim');
-  lastPos = null;
-  touchMoved = false;
-  touchCursor.classList.remove('show');
-  if (longTimer) { clearTimeout(longTimer); longTimer = null; }
+  twoFingerCount = 0;
+  resetTouchState();
 });
 
 /* --- Click Buttons --- */
