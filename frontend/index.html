@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Remote Mouse v1.0.0</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200">
 <style>
 :root{
   --bg:#0a0a0a;--bg2:#0d0d0d;--bg3:#111;--bg4:#1a1a1a;
@@ -145,7 +146,8 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
 /* Bottom nav */
 #bottom-nav{display:flex;border-top:1px solid var(--border);background:var(--bg2);padding-bottom:env(safe-area-inset-bottom)}
 #bottom-nav button{flex:1;padding:10px 0 8px;background:none;border:none;color:var(--text4);font-size:11px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px;transition:color .2s}
-#bottom-nav button .icon{font-size:20px;line-height:1}
+#bottom-nav button .icon{font-size:20px;line-height:1;font-family:'Material Symbols Outlined';font-variation-settings:'FILL' 0,'wght' 700,'GRAD' 0,'opsz' 20;color:#fff}
+:root.light #bottom-nav button .icon{color:#000}
 #bottom-nav button.active{color:var(--accent)}
 
 /* Sensitivity panel */
@@ -220,11 +222,11 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
 
   <!-- Bottom Nav -->
   <div id="bottom-nav">
-    <button class="active" data-tab="touchpad-page"><span class="icon">⌇</span>Touchpad</button>
-    <button data-tab="media-page"><span class="icon">♪</span>Media</button>
-    <button data-tab="link-page"><span class="icon">⊕</span>Link</button>
-    <button id="mode-nav-btn" data-tab="touchpad-page"><span class="icon">⇄</span><span id="mode-nav-label">Mouse</span></button>
-    <button id="settings-btn"><span class="icon">☰</span></button>
+    <button class="active" data-tab="touchpad-page"><span class="icon">mouse</span>Touchpad</button>
+    <button data-tab="media-page"><span class="icon">music_note</span>Media</button>
+    <button data-tab="link-page"><span class="icon">link</span>Link</button>
+    <button id="mode-nav-btn" class="touch"><span class="icon">swap_horiz</span><span id="mode-nav-label">Mouse</span></button>
+    <button id="settings-btn"><span class="icon">settings</span></button>
   </div>
 
   <!-- Sensitivity Panel -->
@@ -638,9 +640,9 @@ document.getElementById('bottom-nav').addEventListener('click', (e) => {
     sensPanel.classList.toggle('open');
     return;
   }
+  if (btn.id === 'mode-nav-btn') return;
 
   const tab = btn.dataset.tab;
-  if (!tab) return;
 
   sensPanel.classList.remove('open');
   document.querySelectorAll('#bottom-nav button').forEach(b => b.classList.remove('active'));
