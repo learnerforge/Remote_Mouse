@@ -79,13 +79,10 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
 #click-bar .drag-btn{flex:0 0 52px;font-size:18px;color:var(--text3);background:var(--drag-bg)}
 #click-bar .drag-btn.on{color:var(--accent);background:var(--drag-on-bg);box-shadow:0 0 8px var(--glow2)}
 
-/* Mode toggle */
-#mode-toggle{display:flex;gap:0;padding:6px 16px;background:var(--bg2);border-bottom:1px solid var(--border);align-items:center}
-.mode-btn{flex:1;padding:7px;border:1px solid var(--border2);background:var(--bg3);color:var(--text4);font-size:12px;cursor:pointer;transition:all .15s;text-align:center;touch-action:manipulation}
-.mode-btn:first-child{border-radius:8px 0 0 8px}
-.mode-btn:last-child{border-radius:0 8px 8px 0}
-.mode-btn.active{background:var(--drag-on-bg);color:var(--accent);border-color:var(--mode-border)}
-#mode-indicator{font-size:10px;color:var(--text4);margin-left:8px;white-space:nowrap}
+/* Bottom nav — mode toggle button */
+#mode-nav-btn .icon{transition:transform .3s cubic-bezier(.34,1.56,.64,1)}
+#mode-nav-btn.touch .icon{transform:rotate(0)}
+#mode-nav-btn.mouse .icon{transform:rotate(180deg)}
 
 /* Media page */
 #media-page{align-items:center;justify-content:center;gap:20px;padding:20px}
@@ -168,17 +165,13 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
     <span><span class="dot" id="status-dot"></span><span id="status-text">Connecting...</span></span>
     <span style="display:flex;align-items:center;gap:8px">
       <span id="status-ip"></span>
+      <span id="mode-indicator" style="font-size:10px;color:var(--text4)">relative</span>
       <span id="theme-btn">☾</span>
     </span>
   </div>
 
   <!-- Touchpad Page -->
   <div class="page active" id="touchpad-page">
-    <div id="mode-toggle">
-      <button class="mode-btn active" data-mode="touchpad">Touchpad</button>
-      <button class="mode-btn" data-mode="mouse">Mouse</button>
-      <span id="mode-indicator">relative</span>
-    </div>
     <div id="touchpad">
       <div id="touch-cursor"></div>
       <div id="tap-ripple"></div>
@@ -227,9 +220,10 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
 
   <!-- Bottom Nav -->
   <div id="bottom-nav">
-    <button class="active" data-page="touchpad-page"><span class="icon">⌇</span>Touchpad</button>
-    <button data-page="media-page"><span class="icon">♪</span>Media</button>
-    <button data-page="link-page"><span class="icon">⊕</span>Link</button>
+    <button class="active" data-tab="touchpad-page"><span class="icon">⌇</span>Touchpad</button>
+    <button data-tab="media-page"><span class="icon">♪</span>Media</button>
+    <button data-tab="link-page"><span class="icon">⊕</span>Link</button>
+    <button id="mode-nav-btn" data-tab="touchpad-page"><span class="icon">⇄</span><span id="mode-nav-label">Mouse</span></button>
     <button id="settings-btn"><span class="icon">☰</span></button>
   </div>
 
@@ -285,9 +279,8 @@ const touchCursor = document.getElementById('touch-cursor');
 const tapRipple = document.getElementById('tap-ripple');
 const longRing = document.getElementById('long-ring');
 const scrollInd = document.getElementById('scroll-ind');
-const modeBtnContainer = document.getElementById('mode-toggle');
-const modeBtns = modeBtnContainer.querySelectorAll('.mode-btn');
-const modeIndicator = document.getElementById('mode-indicator');
+const modeNavBtn = document.getElementById('mode-nav-btn');
+const modeNavLabel = document.getElementById('mode-nav-label');
 const themeBtn = document.getElementById('theme-btn');
 
 let mode = 'touchpad';
@@ -406,17 +399,20 @@ sendBtn.addEventListener('click', () => {
   });
 });
 
-/* --- Mode Toggle --- */
-modeBtnContainer.addEventListener('click', (e) => {
-  const btn = e.target.closest('.mode-btn');
-  if (!btn) return;
-  mode = btn.dataset.mode;
-  modeBtns.forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
-  modeIndicator.textContent = mode === 'touchpad' ? 'relative' : 'absolute';
+/* --- Mode Toggle (in bottom nav) --- */
+function toggleMode() {
+  const prev = mode;
+  mode = mode === 'touchpad' ? 'mouse' : 'touchpad';
+  modeNavBtn.classList.toggle('mouse', mode === 'mouse');
+  modeNavBtn.classList.toggle('touch', mode === 'touchpad');
+  modeNavLabel.textContent = mode === 'touchpad' ? 'Mouse' : 'Touch';
+  document.getElementById('mode-indicator').textContent = mode === 'touchpad' ? 'relative' : 'absolute';
   document.getElementById('touchpad-label').textContent = mode === 'touchpad' ? 'Touch & drag to move' : 'Touch screen to position cursor';
   dragToggle.style.display = mode === 'touchpad' ? '' : 'none';
   resetTouchState();
-});
+  if (mode !== prev) navigator.vibrate && navigator.vibrate(8);
+}
+modeNavBtn.addEventListener('click', toggleMode);
 
 /* --- Touchpad Logic --- */
 function absPos(t) {
@@ -637,18 +633,20 @@ document.getElementById('media-mute').addEventListener('click', () => {
 document.getElementById('bottom-nav').addEventListener('click', (e) => {
   const btn = e.target.closest('button');
   if (!btn) return;
-  const page = btn.dataset.page;
 
   if (btn.id === 'settings-btn') {
     sensPanel.classList.toggle('open');
     return;
   }
 
+  const tab = btn.dataset.tab;
+  if (!tab) return;
+
   sensPanel.classList.remove('open');
   document.querySelectorAll('#bottom-nav button').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-  document.getElementById(page).classList.add('active');
+  document.getElementById(tab).classList.add('active');
 });
 
 /* --- Sensitivity --- */
