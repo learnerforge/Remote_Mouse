@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Troubleshooting — Remote Mouse Docs</title>
-<link rel="stylesheet" href="../css/style.css">
+<link rel="stylesheet" href="css/style.css">
 <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
 <script>mermaid.initialize({startOnLoad:true,theme:'dark',fontSize:13})</script>
 </head>
@@ -41,14 +41,14 @@
 
 <table>
 <tr><th>Problem</th><th>Quick Fix</th></tr>
-<tr><td>---------</td><td>-----------</td></tr>
+<tr><td></td><td></td></tr>
 <tr><td>Page won't load on phone</td><td>Check WiFi / same network / firewall</td></tr>
 <tr><td>WebSocket won't connect</td><td>Check server is running / correct URL</td></tr>
 <tr><td>Mouse moves but lags</td><td>Reduce sensitivity / check network latency</td></tr>
 <tr><td>Clicks not working</td><td>Check server logs / pyautogui permissions</td></tr>
 <tr><td>Email not sending</td><td>Run <code>python src/email_service.py --test</code></td></tr>
 <tr><td>Tunnel URL not appearing</td><td>Check cloudflared installed and started</td></tr>
-<tr><td>CLI shows "Server stopped"</td><td>Port in use / check <code>server.log</code></td></tr>
+<tr><td>CLI shows "Server stopped"</td><td>Port in use / check <code>events.log</code></td></tr>
 <tr><td>Two-finger scroll not working</td><td>Use 2 fingers, check scroll zone</td></tr>
 <tr><td>DPI presets not responding</td><td>Check index.html v1.0.0 preset buttons</td></tr>
 </table>
@@ -89,7 +89,7 @@
 <ul>
 <li>Ensure phone and laptop are on the <strong>same</strong> network</li>
 <li>Check laptop's IP: <code>ipconfig</code> (Windows) or <code>ip addr</code> (Linux/macOS)</li>
-<li>Use <code>http://<ip>:5000</code> (not <code>https://</code>)</li>
+<li>Use <code>http://&lt;ip&gt;:5000</code> (not <code>https://</code>)</li>
 <li>For remote access, use the Cloudflare tunnel URL</li>
 </ul>
 
@@ -114,13 +114,13 @@
 
 <p>If you changed the port in <code>server.py</code>:</p>
 <pre><code>socketio.run(app, host=&#x27;0.0.0.0&#x27;, port=5000, ...)</code></pre>
-<p>Use <code>http://<ip>:<new-port></code> instead of <code>:5000</code>.</p>
+<p>Use <code>http://&lt;ip&gt;:&lt;new-port&gt;</code> instead of <code>:5000</code>.</p>
 
 <h4>Phone Browser Issues</h4>
 
 <table>
 <tr><th>Action</th><th>Why</th></tr>
-<tr><td>--------</td><td>-----</td></tr>
+<tr><td></td><td></td></tr>
 <tr><td>Use Chrome, Edge, or Safari (latest)</td><td>Best touch + WebSocket support</td></tr>
 <tr><td>Clear browser cache</td><td>Stale JS may have incompatible socket.io version</td></tr>
 <tr><td>Disable ad blocker</td><td>Some block WebSocket connections</td></tr>
@@ -213,7 +213,7 @@ socket.emit(&#x27;mouse_move&#x27;, {
 
 <table>
 <tr><th>Issue</th><th>Fix</th></tr>
-<tr><td>-------</td><td>-----</td></tr>
+<tr><td></td><td></td></tr>
 <tr><td>Too fast</td><td>Set sensitivity to 0.5x or 0.2x</td></tr>
 <tr><td>Too slow</td><td>Set sensitivity to 2.0x or 3.0x</td></tr>
 <tr><td>Changes not applied</td><td>Slider adjusts in real-time. Check <code>sens-slider</code> value</td></tr>
@@ -243,7 +243,7 @@ socket.emit(&#x27;mouse_move&#x27;, {
 
 <table>
 <tr><th>Symptom</th><th>Cause</th><th>Fix</th></tr>
-<tr><td>---------</td><td>-------</td><td>-----</td></tr>
+<tr><td></td><td></td><td></td></tr>
 <tr><td>Drag doesn't hold button</td><td>Drag Mode not toggled on</td><td>Tap drag button (center) until green</td></tr>
 <tr><td>Drag moves without clicking</td><td>Drag Mode is on, tap still works</td><td>Tap = click, drag = hold+move</td></tr>
 <tr><td>Drag speed too fast</td><td>1.2x multiplier applies</td><td>Edit multiplier in <code>index.html</code></td></tr>
@@ -461,7 +461,7 @@ taskkill /PID &lt;pid&gt; /F</code></pre>
 
 <table>
 <tr><th>Cause</th><th>Latency</th><th>Fix</th></tr>
-<tr><td>-------</td><td>---------</td><td>-----</td></tr>
+<tr><td></td><td></td><td></td></tr>
 <tr><td>Different networks</td><td>∞</td><td>Move to same WiFi</td></tr>
 <tr><td>2.4GHz WiFi</td><td>10–30ms extra</td><td>Switch to 5GHz</td></tr>
 <tr><td>Network congestion</td><td>50–200ms extra</td><td>Close streaming/downloads</td></tr>
@@ -476,16 +476,11 @@ taskkill /PID &lt;pid&gt; /F</code></pre>
 <p><strong>Fixes (in order of effectiveness):</strong></p>
 
 <ol>
-<li><strong>Increase dead zone in <code>index.html</code>:</strong></li>
-</ol>
+<li><strong>Increase dead zone in <code>index.html</code>:</strong>
 <pre><code>   // Change from &gt; 1 to &gt; 3
-   if (Math.abs(dx) &gt; 3 || Math.abs(dy) &gt; 3) {</code></pre>
-
-<ol>
+    if (Math.abs(dx) &gt; 3 || Math.abs(dy) &gt; 3) {</code></pre>
+</li>
 <li><strong>Lower sensitivity:</strong> Reduces amplification of micro-movements</li>
-</ol>
-
-<ol>
 <li><strong>Clean phone screen:</strong> Oil, moisture, or screen protector can cause erratic touch readings</li>
 </ol>
 
@@ -531,7 +526,7 @@ subprocess.run([&#x27;xdotool&#x27;, &#x27;mousemove_relative&#x27;, &#x27;--&#x
 
 <table>
 <tr><th>Browser</th><th>WebSocket</th><th>Haptic</th><th>Clipboard</th><th>Status</th></tr>
-<tr><td>---------</td><td>-----------</td><td>--------</td><td>-----------</td><td>--------</td></tr>
+<tr><td></td><td></td><td></td><td></td></tr>
 <tr><td>Chrome (Android)</td><td>✅</td><td>✅</td><td>✅</td><td>Best experience</td></tr>
 <tr><td>Edge (Android)</td><td>✅</td><td>✅</td><td>✅</td><td>Same engine as Chrome</td></tr>
 <tr><td>Samsung Internet</td><td>✅</td><td>✅</td><td>✅</td><td>Minor CSS differences</td></tr>
@@ -551,7 +546,7 @@ subprocess.run([&#x27;xdotool&#x27;, &#x27;mousemove_relative&#x27;, &#x27;--&#x
 
 <table>
 <tr><th>Error Message</th><th>Meaning</th><th>Fix</th></tr>
-<tr><td>---------------</td><td>---------</td><td>-----</td></tr>
+<tr><td></td><td></td><td></td></tr>
 <tr><td><code>[Errno 10048] Address already in use</code></td><td>Port 5000 already used</td><td>Kill process or change port</td></tr>
 <tr><td><code>pyautogui.PyAutoGUIException</code></td><td>pyautogui operation failed</td><td>Grant macOS permissions / check OS</td></tr>
 <tr><td><code>smtplib.SMTPAuthenticationError</code></td><td>SMTP login failed</td><td>Check username and password</td></tr>
@@ -587,7 +582,7 @@ subprocess.run([&#x27;xdotool&#x27;, &#x27;mousemove_relative&#x27;, &#x27;--&#x
 
 <table>
 <tr><th>Issue</th><th>Cause</th><th>Fix</th></tr>
-<tr><td>-------</td><td>-------</td><td>-----</td></tr>
+<tr><td></td><td></td><td></td></tr>
 <tr><td>DPI buttons don't respond</td><td>JS event not bound</td><td>Check <code>index.html</code> for <code>click</code> handlers on preset buttons</td></tr>
 <tr><td>DPI setting not saved</td><td>Session-only storage</td><td>Profile persistence not yet implemented (planned for v1.0.4)</td></tr>
 <tr><td>Effective DPI shows wrong value</td><td>Base DPI calculation mismatch</td><td>Check <code>base_dpi</code> constant in <code>src/server.py</code></td></tr>

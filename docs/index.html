@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Home — Remote Mouse Docs</title>
-<link rel="stylesheet" href="../css/style.css">
+<link rel="stylesheet" href="css/style.css">
 <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
 <script>mermaid.initialize({startOnLoad:true,theme:'dark',fontSize:13})</script>
 </head>
@@ -151,7 +151,7 @@
 
 <table>
 <tr><th>Feature</th><th>What it does</th></tr>
-<tr><td>---------</td><td>-------------</td></tr>
+<tr><td></td><td></td></tr>
 <tr><td><strong>Touchpad</strong></td><td>Touch and drag to move cursor. Tap to click. Two-finger scroll.</td></tr>
 <tr><td><strong>Left/Right Click</strong></td><td>Dedicated buttons at the bottom for precise clicks.</td></tr>
 <tr><td><strong>Drag Mode</strong></td><td>Hold left button while dragging for selections, moving windows.</td></tr>
@@ -174,7 +174,7 @@
 
 <table>
 <tr><th>Scenario</th><th>Why Remote Mouse</th></tr>
-<tr><td>----------</td><td>-----------------</td></tr>
+<tr><td></td><td></td></tr>
 <tr><td><strong>Presentations</strong></td><td>Control slides from across the room. No clicker needed.</td></tr>
 <tr><td><strong>Media PC</strong></td><td>Laptop plugged into TV. Phone becomes media remote.</td></tr>
 <tr><td><strong>Couch browsing</strong></td><td>Navigate laptop from the sofa without getting up.</td></tr>
@@ -211,7 +211,7 @@ pip install -r requirements.txt
 # (Optional) Configure SMTP email
 cp .env.example .env</code></pre>
 
-<p>Edit <code>.env</code> with your SMTP credentials. For Gmail you need an App Password (enable 2FA → https://myaccount.google.com/apppasswords). See <code>docs/CONFIGURATION.md</code> for provider examples.</p>
+<p>Edit <code>.env</code> with your SMTP credentials. For Gmail you need an App Password (enable 2FA → https://myaccount.google.com/apppasswords). See <code>configuration.html</code> for provider examples.</p>
 
 <hr>
 
@@ -258,7 +258,7 @@ python src/server.py</code></pre>
 
 <table>
 <tr><th>Scenario</th><th>Latency</th><th>Notes</th></tr>
-<tr><td>----------</td><td>---------</td><td>-------</td></tr>
+<tr><td></td><td></td><td></td></tr>
 <tr><td><strong>Same WiFi (local)</strong></td><td>~5–15 ms</td><td>Best experience. Both devices on same network.</td></tr>
 <tr><td><strong>Cloudflare tunnel</strong></td><td>~50–200 ms</td><td>Depends on internet speed and distance to Cloudflare edge.</td></tr>
 <tr><td><strong>Phone hotspot</strong></td><td>~30–100 ms</td><td>Phone connects to laptop's hotspot. No external network needed.</td></tr>
@@ -283,7 +283,7 @@ python src/server.py</code></pre>
 
 <table>
 <tr><th>Action</th><th>Keys</th><th>pyautogui call</th></tr>
-<tr><td>--------</td><td>------</td><td>----------------</td></tr>
+<tr><td></td><td></td><td></td></tr>
 <tr><td>Switch apps</td><td><code>Alt+Tab</code></td><td><code>hotkey('alt', 'tab')</code></td></tr>
 <tr><td>Show desktop</td><td><code>Win+D</code></td><td><code>hotkey('win', 'd')</code></td></tr>
 <tr><td>Task view</td><td><code>Win+Tab</code></td><td><code>hotkey('win', 'tab')</code></td></tr>
@@ -310,18 +310,18 @@ python src/server.py</code></pre>
 
 <table>
 <tr><th>Path</th><th>Purpose</th></tr>
-<tr><td>------</td><td>---------</td></tr>
+<tr><td></td><td></td></tr>
 <tr><td><code>src/server.py</code></td><td>Flask + Flask-SocketIO + pyautogui + cloudflared + setup API</td></tr>
 <tr><td><code>src/cli.py</code></td><td>REPL control panel, subprocess manager, live logs</td></tr>
 <tr><td><code>src/email_service.py</code></td><td>SMTP sender (importable + CLI modes)</td></tr>
 <tr><td><code>frontend/index.html</code></td><td>Main mouse control page (touchpad, media, link)</td></tr>
 <tr><td><code>frontend/setup.html</code></td><td>3-step setup wizard</td></tr>
 <tr><td><code>frontend/static/socket.io.min.js</code></td><td>Socket.IO v4.7.5 (49 KB)</td></tr>
-<tr><td><code>docs/ARCHITECTURE.md</code></td><td>System architecture with Mermaid diagrams</td></tr>
-<tr><td><code>docs/CONFIGURATION.md</code></td><td>Configuration reference with Mermaid diagrams</td></tr>
-<tr><td><code>docs/PROTOCOL.md</code></td><td>WebSocket protocol with sequence diagrams</td></tr>
-<tr><td><code>docs/TROUBLESHOOTING.md</code></td><td>Issue resolution with decision trees</td></tr>
-<tr><td><code>docs/COMPARISON.md</code></td><td>Wired mouse vs Remote Mouse spec comparison</td></tr>
+<tr><td><code>architecture.html</code></td><td>System architecture with Mermaid diagrams</td></tr>
+<tr><td><code>configuration.html</code></td><td>Configuration reference with Mermaid diagrams</td></tr>
+<tr><td><code>protocol.html</code></td><td>WebSocket protocol with sequence diagrams</td></tr>
+<tr><td><code>troubleshooting.html</code></td><td>Issue resolution with decision trees</td></tr>
+<tr><td><code>comparison.html</code></td><td>Wired mouse vs Remote Mouse spec comparison</td></tr>
 </table>
 
 <hr>
@@ -347,9 +347,6 @@ netstat -ano | findstr :5000</code></pre>
 <h2>Future Improvements</h2>
 
 <ul>
-<li>Add middle click and back/forward navigation buttons</li>
-<li>Implement acceleration curves, flick scroll, and momentum</li>
-<li>Add polling rate control and real-time rate monitoring</li>
 <li>Support Bluetooth and LAN discovery for zero-config connection</li>
 <li>Add remappable buttons, macro editor, and onboard profile storage</li>
 <li>Develop ergonomic UI themes, palm rejection, and grip calibration</li>
@@ -361,11 +358,11 @@ netstat -ano | findstr :5000</code></pre>
 
 <table>
 <tr><th>Version</th><th>Date</th><th>Changes</th></tr>
-<tr><td>---------</td><td>------</td><td>---------</td></tr>
+<tr><td></td><td></td><td></td></tr>
 <tr><td>v5.0.1</td><td>2026-06</td><td>Two-finger scroll fix, orphan code cleanup, project restructuring</td></tr>
 <tr><td>v5.0.0</td><td>2026-06</td><td>Initial full release, all core features</td></tr>
 <tr><td>v1.0.0</td><td>Current</td><td>DPI presets added (400/800/1600/3200)</td></tr>
-<tr><td>Planned</td><td>Future</td><td>120 versions across 30 specs — see <code>docs/COMPARISON.md</code></td></tr>
+<tr><td>Planned</td><td>Future</td><td>120 versions across 30 specs — see <code>comparison.html</code></td></tr>
 </table>
 
 <hr>
@@ -374,12 +371,12 @@ netstat -ano | findstr :5000</code></pre>
 
 <table>
 <tr><th>File</th><th>What it covers</th></tr>
-<tr><td>------</td><td>----------------</td></tr>
-<tr><td><code>docs/ARCHITECTURE.md</code></td><td>System architecture, component diagrams, data flow, threading model</td></tr>
-<tr><td><code>docs/CONFIGURATION.md</code></td><td>All config options: .env, server settings, frontend tunables, file paths</td></tr>
-<tr><td><code>docs/PROTOCOL.md</code></td><td>WebSocket event reference, REST API, sequence diagrams</td></tr>
-<tr><td><code>docs/TROUBLESHOOTING.md</code></td><td>Decision trees for connection, mouse, media, email, tunnel, CLI issues</td></tr>
-<tr><td><code>docs/COMPARISON.md</code></td><td>30-spec comparison vs wired mouse with scores and Mermaid charts</td></tr>
+<tr><td></td><td></td></tr>
+<tr><td><code>architecture.html</code></td><td>System architecture, component diagrams, data flow, threading model</td></tr>
+<tr><td><code>configuration.html</code></td><td>All config options: .env, server settings, frontend tunables, file paths</td></tr>
+<tr><td><code>protocol.html</code></td><td>WebSocket event reference, REST API, sequence diagrams</td></tr>
+<tr><td><code>troubleshooting.html</code></td><td>Decision trees for connection, mouse, media, email, tunnel, CLI issues</td></tr>
+<tr><td><code>comparison.html</code></td><td>30-spec comparison vs wired mouse with scores and Mermaid charts</td></tr>
 </table>
 
 <hr>
@@ -388,7 +385,7 @@ netstat -ano | findstr :5000</code></pre>
 
 <p>This project is designed to be minimal and self-contained. The frontend is a single HTML file with no build tools. The backend is three Python files with no database, no authentication, and no external services except cloudflared and SMTP.</p>
 
-<p>If you want to add features, start by reading <code>docs/ARCHITECTURE.md</code> to understand the data flow, then look at the WebSocket protocol in <code>docs/PROTOCOL.md</code>.</p>
+<p>If you want to add features, start by reading <code>architecture.html</code> to understand the data flow, then look at the WebSocket protocol in <code>protocol.html</code>.</p>
 
 <hr>
 

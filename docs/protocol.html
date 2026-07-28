@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Protocol — Remote Mouse Docs</title>
-<link rel="stylesheet" href="../css/style.css">
+<link rel="stylesheet" href="css/style.css">
 <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
 <script>mermaid.initialize({startOnLoad:true,theme:'dark',fontSize:13})</script>
 </head>
@@ -41,7 +41,7 @@
 
 <table>
 <tr><th>Property</th><th>Value</th></tr>
-<tr><td>----------</td><td>-------</td></tr>
+<tr><td></td><td></td></tr>
 <tr><td><strong>Primary</strong></td><td>WebSocket</td></tr>
 <tr><td><strong>Fallback</strong></td><td>HTTP long-polling (Socket.IO auto-negotiates)</td></tr>
 <tr><td><strong>Library</strong></td><td>Socket.IO v4 (client: 4.7.5, server: Flask-SocketIO 5.x)</td></tr>
@@ -80,8 +80,8 @@
         end
     end
 
-    Client-&gt;&gt;Server: socket.emit(&quot;connect&quot;, auth)
-    Server--&gt;&gt;Client: socket.emit(&quot;screen_info&quot;, {width, height, ip, tunnel_url})</pre>
+    Note over Client,Server: Socket.IO automatically establishes connection
+    Server--&gt;&gt;Client: screen_info {width, height, ip, tunnel_url}</pre>
 
 <h3>Client Connection Options</h3>
 
@@ -112,7 +112,7 @@
 
 <table>
 <tr><th>Field</th><th>Type</th><th>Description</th></tr>
-<tr><td>-------</td><td>------</td><td>-------------</td></tr>
+<tr><td></td><td></td><td></td></tr>
 <tr><td><code>width</code></td><td>int</td><td>Screen width in pixels</td></tr>
 <tr><td><code>height</code></td><td>int</td><td>Screen height in pixels</td></tr>
 <tr><td><code>ip</code></td><td>string</td><td>Local IP address of the laptop</td></tr>
@@ -129,7 +129,7 @@
 
 <table>
 <tr><th>Field</th><th>Type</th><th>Description</th></tr>
-<tr><td>-------</td><td>------</td><td>-------------</td></tr>
+<tr><td></td><td></td><td></td></tr>
 <tr><td><code>url</code></td><td>string</td><td>Current tunnel URL (empty if no active tunnel)</td></tr>
 </table>
 
@@ -164,7 +164,7 @@
 
 <table>
 <tr><th>Field</th><th>Type</th><th>Range</th><th>Description</th></tr>
-<tr><td>-------</td><td>------</td><td>-------</td><td>-------------</td></tr>
+<tr><td></td><td></td><td></td><td></td></tr>
 <tr><td><code>dx</code></td><td>int</td><td>-500 to +500</td><td>Delta X (positive = right, negative = left)</td></tr>
 <tr><td><code>dy</code></td><td>int</td><td>-500 to +500</td><td>Delta Y (positive = down, negative = up)</td></tr>
 </table>
@@ -218,7 +218,7 @@ def handle_move(data):
 
 <table>
 <tr><th>Field</th><th>Type</th><th>Values</th><th>Description</th></tr>
-<tr><td>-------</td><td>------</td><td>--------</td><td>-------------</td></tr>
+<tr><td></td><td></td><td></td><td></td></tr>
 <tr><td><code>button</code></td><td>string</td><td><code>"left"</code> or <code>"right"</code></td><td>Which mouse button to click</td></tr>
 </table>
 
@@ -273,7 +273,7 @@ if (e.changedTouches.length === 1 &amp;&amp; !touchMoved &amp;&amp; Date.now() -
 
 <table>
 <tr><th>Field</th><th>Type</th><th>Description</th></tr>
-<tr><td>-------</td><td>------</td><td>-------------</td></tr>
+<tr><td></td><td></td><td></td></tr>
 <tr><td><code>dy</code></td><td>int</td><td>Scroll delta in pixels (positive = scroll down, negative = scroll up)</td></tr>
 </table>
 
@@ -307,7 +307,7 @@ def handle_scroll(data):
 
 <table>
 <tr><th>Field</th><th>Type</th><th>Allowed Values</th><th>Description</th></tr>
-<tr><td>-------</td><td>------</td><td>----------------</td><td>-------------</td></tr>
+<tr><td></td><td></td><td></td><td></td></tr>
 <tr><td><code>action</code></td><td>string</td><td><code>play_pause</code>, <code>next</code>, <code>prev</code>, <code>vol_up</code>, <code>vol_down</code>, <code>mute</code></td><td>Which media action</td></tr>
 </table>
 
@@ -315,7 +315,7 @@ def handle_scroll(data):
 
 <table>
 <tr><th>Frontend button</th><th><code>action</code> value</th><th>pyautogui key</th><th>OS effect</th></tr>
-<tr><td>-----------------</td><td>----------------</td><td>---------------</td><td>-----------</td></tr>
+<tr><td></td><td></td><td></td><td></td></tr>
 <tr><td>Play/Pause (big center)</td><td><code>play_pause</code></td><td><code>playpause</code></td><td>Toggle playback</td></tr>
 <tr><td>Next (skip forward)</td><td><code>next</code></td><td><code>nexttrack</code></td><td>Next track</td></tr>
 <tr><td>Prev (skip back)</td><td><code>prev</code></td><td><code>prevtrack</code></td><td>Previous track</td></tr>
@@ -505,7 +505,7 @@ def handle_media(data):
 
 <table>
 <tr><th>Field</th><th>Type</th><th>Description</th></tr>
-<tr><td>-------</td><td>------</td><td>-------------</td></tr>
+<tr><td></td><td></td><td></td></tr>
 <tr><td><code>running</code></td><td>bool</td><td>Setup in progress</td></tr>
 <tr><td><code>done</code></td><td>bool</td><td>Setup completed</td></tr>
 <tr><td><code>case</code></td><td>string</td><td>Selected connection case</td></tr>
@@ -542,7 +542,7 @@ def handle_media(data):
 <p><strong>Status bar indicators:</strong></p>
 <table>
 <tr><th>State</th><th>Dot Color</th><th>Text</th></tr>
-<tr><td>-------</td><td>-----------</td><td>------</td></tr>
+<tr><td></td><td></td><td></td></tr>
 <tr><td>Connected</td><td>Green</td><td>"Connected"</td></tr>
 <tr><td>Disconnected</td><td>Gray</td><td>"Disconnected"</td></tr>
 <tr><td>Reconnecting</td><td>Yellow</td><td>"Reconnecting (3)..."</td></tr>

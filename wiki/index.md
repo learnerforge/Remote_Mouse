@@ -12,6 +12,7 @@ Welcome to the Remote Mouse project wiki. This is a collaborative knowledge base
 | [FAQ](FAQ.md) | Frequently asked questions |
 | [CHANGELOG](CHANGELOG.md) | Version history and release notes |
 | [PLAN](PLAN.md) | Roadmap and future version plan |
+| [Version Control](../version_control.md) | Version plan and roadmap |
 
 ---
 

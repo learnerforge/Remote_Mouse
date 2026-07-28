@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Architecture — Remote Mouse Docs</title>
-<link rel="stylesheet" href="../css/style.css">
+<link rel="stylesheet" href="css/style.css">
 <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
 <script>mermaid.initialize({startOnLoad:true,theme:'dark',fontSize:13})</script>
 </head>
@@ -139,7 +139,7 @@
 
 <table>
 <tr><th>Decision</th><th>Rationale</th></tr>
-<tr><td>----------</td><td>-----------</td></tr>
+<tr><td></td><td></td></tr>
 <tr><td><strong>No build step</strong></td><td>Served as-is. No npm, webpack, vite on the laptop</td></tr>
 <tr><td><strong>Local socket.io (49 KB)</strong></td><td>Eliminates 3-minute CDN load on phone hotspot</td></tr>
 <tr><td><strong>Touch Events API</strong></td><td>Broader mobile compatibility than Pointer Events</td></tr>
@@ -199,7 +199,7 @@
 
 <table>
 <tr><th>Event</th><th>Handler</th><th>Action</th></tr>
-<tr><td>-------</td><td>---------</td><td>--------</td></tr>
+<tr><td></td><td></td><td></td></tr>
 <tr><td><code>connect</code></td><td><code>handle_connect</code></td><td>Send screen dimensions, local IP, tunnel URL</td></tr>
 <tr><td><code>disconnect</code></td><td><code>handle_disconnect</code></td><td>Log disconnection</td></tr>
 <tr><td><code>mouse_move</code></td><td><code>handle_move</code></td><td><code>pyautogui.moveRel(dx, dy)</code></td></tr>
@@ -213,7 +213,7 @@
 
 <table>
 <tr><th>Decision</th><th>Rationale</th></tr>
-<tr><td>----------</td><td>-----------</td></tr>
+<tr><td></td><td></td></tr>
 <tr><td><strong>eventlet.monkey_patch()</strong></td><td>Enables native WebSocket; without it Flask-SocketIO falls to HTTP-long-polling</td></tr>
 <tr><td><strong>static_folder=None</strong></td><td>Bypasses Flask 3.0's built-in handler which intercepts <code>/static/</code> before our route</td></tr>
 <tr><td><strong>Cache-Control: no-cache</strong> on HTML</td><td>Prevents cached stale frontend</td></tr>
@@ -251,7 +251,7 @@
 
 <table>
 <tr><th>Command</th><th>Description</th></tr>
-<tr><td>---------</td><td>-------------</td></tr>
+<tr><td></td><td></td></tr>
 <tr><td><code>status</code> or <code>s</code></td><td>Show server status, local IP, tunnel URL</td></tr>
 <tr><td><code>log</code> or <code>l</code></td><td>Show last 20 lines from <code>events.log</code></td></tr>
 <tr><td><code>la</code></td><td>Show ALL lines from <code>events.log</code></td></tr>
@@ -264,7 +264,7 @@
 
 <table>
 <tr><th>Decision</th><th>Rationale</th></tr>
-<tr><td>----------</td><td>-----------</td></tr>
+<tr><td></td><td></td></tr>
 <tr><td><strong>Subprocess (not threading)</strong></td><td>Flask-SocketIO has known threading issues; separate process avoids GIL</td></tr>
 <tr><td><strong><code>-u</code> flag</strong></td><td>Unbuffered Python output ensures real-time log capture</td></tr>
 <tr><td><strong><code>atexit</code> cleanup</strong></td><td>Ensures server process is killed even if CLI crashes</td></tr>
@@ -307,7 +307,7 @@
 
 <table>
 <tr><th>Decision</th><th>Rationale</th></tr>
-<tr><td>----------</td><td>-----------</td></tr>
+<tr><td></td><td></td></tr>
 <tr><td><strong>Plain-text MIME alternative</strong></td><td>Ensures deliverability to SMS gateways that strip HTML</td></tr>
 <tr><td><strong>Importable by server.py</strong></td><td><code>api_send_url</code> calls <code>send_email()</code> directly with tunnel URL</td></tr>
 <tr><td><strong>Standalone CLI</strong></td><td>Test SMTP config without starting full server</td></tr>

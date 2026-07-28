@@ -11,7 +11,7 @@
   --border:#1a1a1a;--border2:#222;
   --text:#fff;--text2:#666;--text3:#888;--text4:#555;--text5:#333;--text6:#444;
   --accent:#4ade80;--accent2:#22c55e;--danger:#f87171;
-  --drag-bg:#141414;--drag-on-bg:#1a2a1a;--mode-border:#2a4a2a;--disabled-bg:#1a4a2a;
+  --drag-bg:#141414;--drag-on-bg:#1a2a1a;--disabled-bg:#1a4a2a;
   --glow:rgba(74,222,128,.35);--glow2:rgba(74,222,128,.15);--glow3:rgba(74,222,128,.6);--glow4:rgba(74,222,128,.03);--glow5:rgba(74,222,128,.025);--glow6:rgba(74,222,128,0);--glow7:rgba(74,222,128,.4)
 }
 :root.light{
@@ -19,7 +19,7 @@
   --border:#c8c8c8;--border2:#b0b0b0;
   --text:#222;--text2:#666;--text3:#888;--text4:#999;--text5:#bbb;--text6:#999;
   --accent:#22c55e;--accent2:#16a34a;--danger:#ef4444;
-  --drag-bg:#e0e0e0;--drag-on-bg:#dcfce7;--mode-border:#86efac;--disabled-bg:#bbf7d0;
+  --drag-bg:#e0e0e0;--drag-on-bg:#dcfce7;--disabled-bg:#bbf7d0;
   --glow:rgba(34,197,94,.25);--glow2:rgba(34,197,94,.12);--glow3:rgba(34,197,94,.5);--glow4:rgba(34,197,94,.05);--glow5:rgba(34,197,94,.04);--glow6:rgba(34,197,94,0);--glow7:rgba(34,197,94,.3)
 }
 *{margin:0;padding:0;box-sizing:border-box}
@@ -82,6 +82,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
 #click-bar .drag-btn.on{color:var(--accent);background:var(--drag-on-bg);box-shadow:0 0 8px var(--glow2)}
 
 /* Bottom nav — mode toggle button */
+#theme-btn{background:none;border:none;padding:0;font-size:inherit;cursor:pointer;}
 #mode-nav-btn .icon{transition:transform .3s cubic-bezier(.34,1.56,.64,1)}
 #mode-nav-btn.touch .icon{transform:rotate(0)}
 #mode-nav-btn.mouse .icon{transform:rotate(180deg)}
@@ -143,6 +144,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
 #link-page .msg.ok{color:var(--accent)}
 #link-page .msg.err{color:var(--danger)}
 #link-page .msg.wait{color:var(--text3)}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0}
 
 /* Bottom nav */
 #bottom-nav{display:flex;border-top:1px solid var(--border);background:var(--bg2);padding-bottom:env(safe-area-inset-bottom)}
@@ -169,7 +171,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
     <span style="display:flex;align-items:center;gap:8px">
       <span id="status-ip"></span>
       <span id="mode-indicator" style="font-size:10px;color:var(--text4)">relative</span>
-      <span id="theme-btn">☾</span>
+      <button id="theme-btn" aria-label="Toggle theme">☾</button>
     </span>
   </div>
 
@@ -200,14 +202,14 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
   <!-- Media Page -->
   <div class="page" id="media-page">
     <div class="row">
-      <div><button id="media-prev">⏮</button><div class="label">Previous</div></div>
-      <div><button class="big" id="media-play"><span class="pw"><span class="pi">▶</span><span class="pa">⏸</span></span></button><div class="label">Play/Pause</div></div>
-      <div><button id="media-next">⏭</button><div class="label">Next</div></div>
+      <div><button id="media-prev" aria-label="Previous track">⏮</button><div class="label">Previous</div></div>
+      <div><button class="big" id="media-play" aria-label="Play/Pause"><span class="pw"><span class="pi">▶</span><span class="pa">⏸</span></span></button><div class="label">Play/Pause</div></div>
+      <div><button id="media-next" aria-label="Next track">⏭</button><div class="label">Next</div></div>
     </div>
     <div class="vol-row">
-      <button id="media-vol-down">▾</button>
-      <button id="media-mute"><span class="mu">○</span><span class="mm">⊘</span></button>
-      <button id="media-vol-up">▴</button>
+      <button id="media-vol-down" aria-label="Volume down">▾</button>
+      <button id="media-mute" aria-label="Mute"><span class="mu">○</span><span class="mm">⊘</span></button>
+      <button id="media-vol-up" aria-label="Volume up">▴</button>
     </div>
   </div>
 
@@ -222,6 +224,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
     <div class="divider">or email it to your phone</div>
 
     <div class="email-form">
+      <label for="email-input" class="sr-only">Email address</label>
       <input type="email" id="email-input" placeholder="Email or SMS gateway address" inputmode="email" autocomplete="email">
       <button id="send-email-btn">Send to my phone</button>
       <div class="msg" id="email-msg"></div>
@@ -234,7 +237,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
     <button data-tab="media-page"><span class="icon">music_note</span>Media</button>
     <button data-tab="link-page"><span class="icon">link</span>Link</button>
     <button id="mode-nav-btn" class="touch"><span class="icon">swap_horiz</span><span id="mode-nav-label">Mouse</span></button>
-    <button id="settings-btn"><span class="icon">settings</span></button>
+    <button id="settings-btn" aria-label="Settings"><span class="icon">settings</span></button>
   </div>
 
   <!-- Sensitivity Panel -->
@@ -378,7 +381,7 @@ copyBtn.addEventListener('click', () => {
     ta.select();
     document.execCommand('copy');
     document.body.removeChild(ta);
-    copyBtn.textContent = '/ Copied!';
+    copyBtn.textContent = '✓ Copied!';
     setTimeout(() => { copyBtn.textContent = '⊕ Copy to clipboard'; }, 2000);
   });
 });
@@ -681,9 +684,10 @@ function mediaAction(action) {
   navigator.vibrate && navigator.vibrate(10);
 }
 
-document.getElementById('media-play').addEventListener('click', () => {
+const mediaPlayBtn = document.getElementById('media-play');
+mediaPlayBtn.addEventListener('click', () => {
   isPlaying = !isPlaying;
-  document.getElementById('media-play').classList.toggle('playing', isPlaying);
+  mediaPlayBtn.classList.toggle('playing', isPlaying);
   mediaAction('play_pause');
 });
 document.getElementById('media-next').addEventListener('click', () => mediaAction('next'));

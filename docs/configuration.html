@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Configuration — Remote Mouse Docs</title>
-<link rel="stylesheet" href="../css/style.css">
+<link rel="stylesheet" href="css/style.css">
 <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
 <script>mermaid.initialize({startOnLoad:true,theme:'dark',fontSize:13})</script>
 </head>
@@ -60,7 +60,7 @@
 
 <table>
 <tr><th>Variable</th><th>Required</th><th>Default</th><th>Description</th></tr>
-<tr><td>----------</td><td>----------</td><td>---------</td><td>-------------</td></tr>
+<tr><td></td><td></td><td></td><td></td></tr>
 <tr><td><code>SMTP_HOST</code></td><td>Yes</td><td>—</td><td>SMTP server hostname (e.g., <code>smtp.gmail.com</code>)</td></tr>
 <tr><td><code>SMTP_PORT</code></td><td>No</td><td><code>587</code></td><td>SMTP port (<code>587</code> STARTTLS, <code>465</code> SSL)</td></tr>
 <tr><td><code>SMTP_USERNAME</code></td><td>Yes</td><td>—</td><td>SMTP auth username (usually your email)</td></tr>
@@ -105,7 +105,7 @@ SMTP_PASSWORD=your-app-password</code></pre>
 
 <table>
 <tr><th>Parameter</th><th>Current Value</th><th>Description</th></tr>
-<tr><td>-----------</td><td>--------------</td><td>-------------</td></tr>
+<tr><td></td><td></td><td></td></tr>
 <tr><td><code>host</code></td><td><code>'0.0.0.0'</code></td><td>Listen on all interfaces (accessible from LAN). Change to <code>'127.0.0.1'</code> for local-only</td></tr>
 <tr><td><code>port</code></td><td><code>5000</code></td><td>TCP port. Change if port is in use</td></tr>
 <tr><td><code>debug</code></td><td><code>False</code></td><td>Flask debug mode. Enable for development with auto-reload</td></tr>
@@ -131,7 +131,7 @@ pyautogui.PAUSE = 0</code></pre>
 
 <table>
 <tr><th>Setting</th><th>Default</th><th>Current</th><th>Effect</th></tr>
-<tr><td>---------</td><td>---------</td><td>---------</td><td>--------</td></tr>
+<tr><td></td><td></td><td></td><td></td></tr>
 <tr><td><code>FAILSAFE</code></td><td><code>True</code></td><td><code>False</code></td><td>When True, mouse in corner raises exception. Disabled to prevent crashes</td></tr>
 <tr><td><code>PAUSE</code></td><td><code>0.1</code></td><td><code>0</code></td><td>Built-in 100ms delay between calls. Set to 0 for zero latency</td></tr>
 </table>
@@ -143,7 +143,7 @@ pyautogui.PAUSE = 0</code></pre>
 
 <table>
 <tr><th>Option</th><th>Value</th><th>Description</th></tr>
-<tr><td>--------</td><td>-------</td><td>-------------</td></tr>
+<tr><td></td><td></td><td></td></tr>
 <tr><td><code>async_mode</code></td><td><code>'eventlet'</code></td><td>WebSocket-native async. Must match <code>eventlet.monkey_patch()</code> at line 1</td></tr>
 <tr><td><code>cors_allowed_origins</code></td><td><code>"*"</code></td><td>Allow connections from any origin (needed for tunnel access)</td></tr>
 <tr><td><code>ping_interval</code></td><td><code>5</code></td><td>Ping every 5 seconds to keep connection alive</td></tr>
@@ -160,7 +160,7 @@ resp.headers[&#x27;Cache-Control&#x27;] = &#x27;public, max-age=86400&#x27;</cod
 
 <table>
 <tr><th>Route</th><th>Cache Policy</th><th>Reason</th></tr>
-<tr><td>-------</td><td>-------------</td><td>--------</td></tr>
+<tr><td></td><td></td><td></td></tr>
 <tr><td><code>/</code> (index.html)</td><td><code>no-cache</code></td><td>Always serve latest frontend</td></tr>
 <tr><td><code>/setup</code> (setup.html)</td><td><code>no-cache</code></td><td>Always serve latest setup wizard</td></tr>
 <tr><td><code>/static/*</code></td><td><code>max-age=86400</code></td><td>socket.io.min.js (49 KB) — cache on phone for 24h</td></tr>
@@ -173,7 +173,7 @@ resp.headers[&#x27;Cache-Control&#x27;] = &#x27;public, max-age=86400&#x27;</cod
 <p>All paths derive from <code>PROJECT_ROOT</code>:</p>
 
 <pre><code>PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-# Resolves to: E:\GitHub Projects\Remote_Mouse\
+# Resolves to: &lt;project-root&gt;/
 
 FRONTEND_DIR = os.path.join(PROJECT_ROOT, &#x27;frontend&#x27;)
 # Resolves to: .../Remote_Mouse/frontend/
@@ -198,7 +198,7 @@ STATIC_DIR = os.path.join(FRONTEND_DIR, &#x27;static&#x27;)
 
 <table>
 <tr><th>Path</th><th>Type</th><th>Purpose</th></tr>
-<tr><td>------</td><td>------</td><td>---------</td></tr>
+<tr><td></td><td></td><td></td></tr>
 <tr><td><code>PROJECT_ROOT/.env</code></td><td>Config</td><td>SMTP credentials (gitignored)</td></tr>
 <tr><td><code>PROJECT_ROOT/.env.example</code></td><td>Template</td><td>Copy to <code>.env</code> and fill in</td></tr>
 <tr><td><code>PROJECT_ROOT/events.log</code></td><td>Runtime</td><td>All server events with timestamps (gitignored)</td></tr>
@@ -219,7 +219,7 @@ STATIC_DIR = os.path.join(FRONTEND_DIR, &#x27;static&#x27;)
 
 <table>
 <tr><th>Option</th><th>Current Value</th><th>Description</th></tr>
-<tr><td>--------</td><td>---------------</td><td>-------------</td></tr>
+<tr><td></td><td></td><td></td></tr>
 <tr><td><code>transports</code></td><td><code>['websocket', 'polling']</code></td><td>WebSocket first, HTTP fallback</td></tr>
 <tr><td><code>reconnection</code></td><td><code>true</code></td><td>Auto-reconnect on disconnect</td></tr>
 <tr><td><code>reconnectionAttempts</code></td><td><code>Infinity</code></td><td>Never stop reconnecting</td></tr>
@@ -233,7 +233,7 @@ STATIC_DIR = os.path.join(FRONTEND_DIR, &#x27;static&#x27;)
 
 <table>
 <tr><th>Attribute</th><th>Value</th><th>Description</th></tr>
-<tr><td>-----------</td><td>-------</td><td>-------------</td></tr>
+<tr><td></td><td></td><td></td></tr>
 <tr><td><code>min</code></td><td><code>0.2</code></td><td>Slowest cursor speed</td></tr>
 <tr><td><code>max</code></td><td><code>3.0</code></td><td>Fastest cursor speed</td></tr>
 <tr><td><code>step</code></td><td><code>0.1</code></td><td>Granularity of adjustment</td></tr>
@@ -246,7 +246,7 @@ STATIC_DIR = os.path.join(FRONTEND_DIR, &#x27;static&#x27;)
 
 <table>
 <tr><th>Constant</th><th>Location</th><th>Effect</th></tr>
-<tr><td>----------</td><td>----------</td><td>--------</td></tr>
+<tr><td></td><td></td><td></td></tr>
 <tr><td><code>400</code></td><td>touchpad touchend handler</td><td>Max ms for a touch to count as a tap</td></tr>
 </table>
 
@@ -258,7 +258,7 @@ STATIC_DIR = os.path.join(FRONTEND_DIR, &#x27;static&#x27;)
 
 <table>
 <tr><th>Value</th><th>Effect</th></tr>
-<tr><td>-------</td><td>--------</td></tr>
+<tr><td></td><td></td></tr>
 <tr><td><code>1</code> px</td><td>Ignore sub-1px jitter. Increase to 3–5 for noisier screens</td></tr>
 </table>
 
@@ -269,7 +269,7 @@ socket.emit(&#x27;mouse_move&#x27;, { dx: dx * sensitivity * 1.2, dy: dy * sensi
 
 <table>
 <tr><th>Value</th><th>Location</th><th>Effect</th></tr>
-<tr><td>-------</td><td>----------</td><td>--------</td></tr>
+<tr><td></td><td></td><td></td></tr>
 <tr><td><code>1.2</code></td><td>touchmove handler when dragMode=true</td><td>Makes dragging slightly faster for cross-screen selections</td></tr>
 </table>
 
@@ -281,7 +281,7 @@ socket.emit(&#x27;mouse_move&#x27;, { dx: dx * sensitivity * 1.2, dy: dy * sensi
 
 <table>
 <tr><th>Value</th><th>Effect</th></tr>
-<tr><td>-------</td><td>--------</td></tr>
+<tr><td></td><td></td></tr>
 <tr><td><code>20</code></td><td>Pixels per scroll notch. Lower = more sensitive (fewer pixels per notch)</td></tr>
 </table>
 
@@ -338,7 +338,7 @@ netsh advfirewall firewall add rule name=&quot;Remote Mouse 5000&quot; dir=in ac
 
 <table>
 <tr><th>Setting</th><th>Value</th><th>Description</th></tr>
-<tr><td>---------</td><td>-------</td><td>-------------</td></tr>
+<tr><td></td><td></td><td></td></tr>
 <tr><td><code>SETUP_URL</code></td><td><code>'http://localhost:5000/setup'</code></td><td>Auto-opened in browser on CLI start</td></tr>
 <tr><td><code>EVENT_LOG_FILE</code></td><td><code>ProjectRoot/events.log</code></td><td>Path to log file for <code>log</code> command</td></tr>
 <tr><td><code>TUNNEL_URL_FILE</code></td><td><code>ProjectRoot/.tunnel_url</code></td><td>Path to tunnel URL for <code>status</code> command</td></tr>
@@ -367,7 +367,7 @@ cd &quot;$PROJECT_ROOT&quot; || exit 1</code></pre>
 
 <table>
 <tr><th>Feature</th><th>Config Point</th><th>Default</th><th>Location</th></tr>
-<tr><td>---------</td><td>-------------</td><td>---------</td><td>----------</td></tr>
+<tr><td></td><td></td><td></td><td></td></tr>
 <tr><td>DPI preset buttons</td><td>400, 800, 1600, 3200</td><td>Added to click bar</td><td><code>frontend/index.html</code></td></tr>
 <tr><td>DPI label</td><td>Shows "400 DPI" etc. next to preset</td><td>In settings panel</td><td><code>frontend/index.html</code></td></tr>
 <tr><td>Sensitivity–DPI mapping</td><td><code>base_dpi = 800</code></td><td>Server-side conversion</td><td><code>src/server.py</code></td></tr>
