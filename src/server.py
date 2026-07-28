@@ -8,6 +8,7 @@ import socket as sock_lib
 import threading
 import time
 import atexit
+import platform
 from datetime import datetime
 from collections import deque
 from flask import Flask, send_file, send_from_directory, request, jsonify
@@ -352,8 +353,21 @@ def handle_mouse_abs(data):
 @socketio.on('click')
 def handle_click(data):
     button = data.get('button', 'left')
-    pyautogui.click(button=button, _pause=False)
+    if button in ('back', 'forward'):
+        _browser_navigate(button)
+    else:
+        pyautogui.click(button=button, _pause=False)
     log_info(f"click {button}")
+
+
+def _browser_navigate(direction):
+    if platform.system() == 'Windows':
+        key = 'browserback' if direction == 'back' else 'browserforward'
+        pyautogui.press(key, _pause=False)
+    elif platform.system() == 'Darwin':
+        pyautogui.hotkey('command', 'left' if direction == 'back' else 'right', _pause=False)
+    else:
+        pyautogui.hotkey('alt', 'left' if direction == 'back' else 'right', _pause=False)
 
 @socketio.on('scroll')
 def handle_scroll(data):

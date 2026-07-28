@@ -72,12 +72,13 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
 #scroll-ind.h .m{display:none}
 
 /* Click bar */
-#click-bar{display:flex;padding:6px 8px;gap:6px;background:var(--bg2);border-top:1px solid var(--border)}
-#click-bar button{flex:1;padding:14px 0;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;background:var(--bg4);color:var(--text);touch-action:manipulation;transition:transform .1s cubic-bezier(.34,1.56,.64,1),background .1s}
+#click-bar{display:flex;flex-direction:column;padding:6px 8px;gap:6px;background:var(--bg2);border-top:1px solid var(--border)}
+.click-row{display:flex;gap:6px}
+#click-bar button{flex:1;padding:12px 0;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;background:var(--bg4);color:var(--text);touch-action:manipulation;transition:transform .1s cubic-bezier(.34,1.56,.64,1),background .1s}
 #click-bar button:active{transform:scale(.96);background:var(--text5)}
 #click-bar .left{color:var(--accent)}
 #click-bar .right{color:var(--danger)}
-#click-bar .drag-btn{flex:0 0 52px;font-size:18px;color:var(--text3);background:var(--drag-bg)}
+#click-bar .drag-btn{flex:0 0 auto;padding:12px 14px;font-size:18px;color:var(--text3);background:var(--drag-bg)}
 #click-bar .drag-btn.on{color:var(--accent);background:var(--drag-on-bg);box-shadow:0 0 8px var(--glow2)}
 
 /* Bottom nav — mode toggle button */
@@ -183,9 +184,16 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
       <div id="scroll-zone">↕</div>
     </div>
     <div id="click-bar">
-      <button class="left" data-button="left">Left</button>
-      <button class="drag-btn" id="drag-toggle" data-drag="0">⊞</button>
-      <button class="right" data-button="right">Right</button>
+      <div class="click-row">
+        <button class="left" data-button="left">Left</button>
+        <button data-button="middle">Middle</button>
+        <button class="right" data-button="right">Right</button>
+      </div>
+      <div class="click-row">
+        <button data-button="back">← Back</button>
+        <button data-button="forward">→ Forward</button>
+        <button class="drag-btn" id="drag-toggle" data-drag="0">⊞ Drag</button>
+      </div>
     </div>
   </div>
 
