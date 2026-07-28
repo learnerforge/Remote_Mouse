@@ -279,6 +279,13 @@ let scrollTimeout = null;
 let lastTapTime = 0;
 let twoFingerCount = 0;
 let tunnelUrl = '';
+let momentumFrame = null;
+let momentumVx = 0;
+let momentumVy = 0;
+let pollRate = 60;
+let lastEmitTime = 0;
+let moveEventsThisSec = 0;
+let moveRateDisplay = 0;
 
 const tunnelUrlDisplay = document.getElementById('tunnel-url-display');
 const copyBtn = document.getElementById('copy-url');
@@ -424,6 +431,38 @@ function toggleMode() {
 }
 modeNavBtn.addEventListener('click', toggleMode);
 
+/* --- Momentum Scroll --- */
+function startMomentum() {
+  if (momentumFrame) cancelAnimationFrame(momentumFrame);
+  const friction = 0.94;
+  const minSpeed = 0.3;
+  function tick() {
+    momentumVx *= friction;
+    momentumVy *= friction;
+    if (Math.abs(momentumVx) < minSpeed && Math.abs(momentumVy) < minSpeed) {
+      momentumFrame = null;
+      momentumVx = 0;
+      momentumVy = 0;
+      scrollInd.classList.remove('show');
+      return;
+    }
+    socket.emit('scroll', { dx: Math.round(momentumVx * 2), dy: Math.round(momentumVy * 2) });
+    scrollInd.classList.add('show');
+    scrollInd.classList.toggle('h', Math.abs(momentumVx) > Math.abs(momentumVy));
+    momentumFrame = requestAnimationFrame(tick);
+  }
+  momentumFrame = requestAnimationFrame(tick);
+}
+
+function stopMomentum() {
+  if (momentumFrame) {
+    cancelAnimationFrame(momentumFrame);
+    momentumFrame = null;
+  }
+  momentumVx = 0;
+  momentumVy = 0;
+}
+
 /* --- Touchpad Logic --- */
 function absPos(t) {
   if (!screenW || !screenH) return;
@@ -468,6 +507,7 @@ function doTap(x, y, button) {
 
 touchpad.addEventListener('touchstart', (e) => {
   e.preventDefault();
+  stopMomentum();
   touchpad.classList.add('dim');
 
   for (const t of e.changedTouches) {
@@ -546,6 +586,12 @@ touchpad.addEventListener('touchmove', (e) => {
         scrollInd.classList.toggle('h', Math.abs(avgDx) > Math.abs(avgDy));
         if (scrollTimeout) clearTimeout(scrollTimeout);
         scrollTimeout = setTimeout(() => scrollInd.classList.remove('show'), 800);
+        const now = Date.now();
+        const dt = Math.max(1, now - (prev1.time || now));
+        momentumVx = momentumVx * 0.5 + (avgDx / dt * 16) * 0.5;
+        momentumVy = momentumVy * 0.5 + (avgDy / dt * 16) * 0.5;
+        prev1.time = now;
+        prev2.time = now;
       }
     }
 
@@ -587,12 +633,16 @@ touchpad.addEventListener('touchend', (e) => {
   }
 
   if (remaining === 0) {
+    if (touchMoved && (Math.abs(momentumVx) > 0.5 || Math.abs(momentumVy) > 0.5)) {
+      startMomentum();
+    }
     twoFingerCount = 0;
     resetTouchState();
   }
 });
 
 touchpad.addEventListener('touchcancel', () => {
+  stopMomentum();
   touches = {};
   twoFingerCount = 0;
   resetTouchState();
