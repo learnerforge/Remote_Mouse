@@ -244,6 +244,10 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
       <button id="sens-close">Done</button>
     </div>
     <input type="range" id="sens-slider" min="0.2" max="3.0" step="0.1" value="1.0">
+    <div class="header" style="margin-top:14px">
+      <span>Poll Rate: <span id="poll-value">60</span> Hz · <span id="rate-display">0</span> Hz</span>
+    </div>
+    <input type="range" id="poll-slider" min="10" max="120" step="5" value="60">
   </div>
 </div>
 
@@ -492,6 +496,9 @@ function moveCursor(dx, dy) {
   }
   lastMoveTime = now;
   if (dragMode) factor *= 1.2;
+  if (now - lastEmitTime < 1000 / pollRate) return;
+  lastEmitTime = now;
+  moveEventsThisSec++;
   socket.emit('mouse_move', { dx: Math.round(dx * factor), dy: Math.round(dy * factor) });
 }
 
@@ -714,6 +721,18 @@ sensSlider.addEventListener('input', () => {
   sensitivity = parseFloat(sensSlider.value);
   sensValue.textContent = sensitivity.toFixed(1);
 });
+
+/* --- Poll Rate --- */
+document.getElementById('poll-slider').addEventListener('input', (e) => {
+  pollRate = parseInt(e.target.value);
+  document.getElementById('poll-value').textContent = pollRate;
+});
+
+setInterval(() => {
+  moveRateDisplay = moveEventsThisSec;
+  moveEventsThisSec = 0;
+  document.getElementById('rate-display').textContent = moveRateDisplay;
+}, 1000);
 
 document.getElementById('sens-close').addEventListener('click', () => {
   sensPanel.classList.remove('open');
