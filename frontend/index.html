@@ -23,11 +23,11 @@
   --glow:rgba(34,197,94,.25);--glow2:rgba(34,197,94,.12);--glow3:rgba(34,197,94,.5);--glow4:rgba(34,197,94,.05);--glow5:rgba(34,197,94,.04);--glow6:rgba(34,197,94,0);--glow7:rgba(34,197,94,.3)
 }
 *{margin:0;padding:0;box-sizing:border-box}
-html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
-#app{display:flex;flex-direction:column;height:100%}
+html,body{height:100%;height:100dvh;overflow:hidden;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
+#app{display:flex;flex-direction:column;height:100%;height:100dvh}
 
 /* Status bar */
-#status-bar{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;font-size:12px;color:var(--text2);background:var(--bg2);border-bottom:1px solid var(--border);min-height:44px}
+#status-bar{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;padding-top:calc(10px + env(safe-area-inset-top,0));font-size:12px;color:var(--text2);background:var(--bg2);border-bottom:1px solid var(--border);min-height:44px}
 #status-bar .dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:8px;background:var(--text4)}
 #status-bar .dot.on{background:var(--accent);box-shadow:0 0 6px var(--glow7)}
 #status-ip{color:var(--text6)}
@@ -52,11 +52,6 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
 @keyframes t-ripple{0%{transform:translate(-50%,-50%) scale(0);opacity:.6}100%{transform:translate(-50%,-50%) scale(4);opacity:0}}
 #tap-ripple{position:absolute;pointer-events:none;z-index:4;width:20px;height:20px;border-radius:50%;border:2.5px solid var(--glow3);transform:translate(-50%,-50%);opacity:0}
 #tap-ripple.go{animation:t-ripple .35s ease-out forwards;opacity:1}
-
-/* Long-press ring */
-@keyframes l-ring{0%{transform:translate(-50%,-50%) scale(0);opacity:.5}100%{transform:translate(-50%,-50%) scale(2);opacity:0}}
-#long-ring{position:absolute;pointer-events:none;z-index:4;width:28px;height:28px;border-radius:50%;border:3px solid var(--danger);transform:translate(-50%,-50%);opacity:0}
-#long-ring.go{animation:l-ring .4s ease-out forwards;opacity:1}
 
 /* Scroll indicator */
 #scroll-ind{position:absolute;right:10px;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;align-items:center;gap:2px;font-size:12px;color:var(--accent);opacity:0;transition:opacity .2s;pointer-events:none;z-index:3;line-height:1}
@@ -148,10 +143,33 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
 
 /* Bottom nav */
 #bottom-nav{display:flex;border-top:1px solid var(--border);background:var(--bg2);padding-bottom:env(safe-area-inset-bottom)}
-#bottom-nav button{flex:1;padding:10px 0 8px;background:none;border:none;color:var(--text4);font-size:11px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px;transition:color .2s}
+#bottom-nav button{flex:1;padding:12px 0 6px;background:none;border:none;color:var(--text4);font-size:11px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:1px;transition:color .2s;min-height:48px}
 #bottom-nav button .icon{font-size:20px;line-height:1;font-family:'Material Symbols Outlined';font-variation-settings:'FILL' 0,'wght' 700,'GRAD' 0,'opsz' 20;color:#fff}
 :root.light #bottom-nav button .icon{color:#000}
 #bottom-nav button.active{color:var(--accent)}
+
+/* Landscape optimizations */
+@media(max-height:480px){
+  #status-bar{padding:4px 12px;min-height:32px;font-size:10px}
+  #status-ip{display:none}
+  #touchpad-label{font-size:11px}
+  #scroll-zone{display:none}
+  #click-bar{flex-direction:row;padding:4px 8px;gap:4px}
+  #click-bar .click-row{flex:1}
+  #click-bar .drag-btn{flex:0 0 auto}
+  #bottom-nav button{font-size:9px;padding:8px 0 4px;min-height:36px}
+  #bottom-nav button .icon{font-size:16px}
+  #media-page{gap:10px;padding:10px}
+  #media-page button{width:48px;height:48px;font-size:18px}
+  #media-page .big{width:60px;height:60px;font-size:24px}
+  #media-page .vol-row button{width:40px;height:40px;font-size:14px}
+}
+@media(max-height:360px){
+  #status-bar{display:none}
+  #click-bar .drag-btn{display:none}
+  #bottom-nav button .icon{font-size:14px}
+  #bottom-nav button{font-size:8px;padding:4px 0 2px;min-height:30px}
+}
 
 /* Sensitivity panel */
 #sens-panel{position:fixed;bottom:0;left:0;right:0;background:var(--bg3);border-top:1px solid var(--border2);padding:16px 20px;padding-bottom:calc(16px + env(safe-area-inset-bottom));transform:translateY(100%);transition:transform .3s;z-index:10}
@@ -180,7 +198,6 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
     <div id="touchpad">
       <div id="touch-cursor"></div>
       <div id="tap-ripple"></div>
-      <div id="long-ring"></div>
       <div id="scroll-ind"><span class="u">▲</span><span class="m">━</span><span class="d">▼</span><span class="l">◄</span><span class="r">►</span></div>
       <span id="touchpad-label">Touch & drag to move</span>
       <div id="scroll-zone">↕</div>
