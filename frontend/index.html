@@ -486,6 +486,10 @@ function resetTouchState() {
   touchMoved = false;
   touchCursor.classList.remove('show');
   if (longTimer) { clearTimeout(longTimer); longTimer = null; }
+  if (longFired) {
+    longFired = false;
+    socket.emit('mouse_up');
+  }
 }
 
 function moveCursor(dx, dy) {
@@ -535,6 +539,17 @@ touchpad.addEventListener('touchstart', (e) => {
     longFired = false;
     twoFingerCount = 0;
 
+    if (longTimer) clearTimeout(longTimer);
+    longTimer = setTimeout(() => {
+      longFired = true;
+      dragMode = true;
+      dragToggle.classList.add('on');
+      dragToggle.dataset.drag = '1';
+      dragToggle.textContent = '⊟';
+      socket.emit('mouse_down');
+      navigator.vibrate && navigator.vibrate(15);
+    }, 450);
+
     const rect = touchpad.getBoundingClientRect();
     touchCursor.style.left = (t.clientX - rect.left) + 'px';
     touchCursor.style.top = (t.clientY - rect.top) + 'px';
@@ -572,6 +587,7 @@ touchpad.addEventListener('touchmove', (e) => {
 
       if (Math.abs(dx) > 1 || Math.abs(dy) > 1) {
         touchMoved = true;
+        if (longTimer) { clearTimeout(longTimer); longTimer = null; }
         moveCursor(dx, dy);
       }
       lastPos = { x: t.clientX, y: t.clientY };
@@ -579,7 +595,6 @@ touchpad.addEventListener('touchmove', (e) => {
     }
   } else if (count === 2) {
     touchCursor.classList.remove('show');
-    if (longTimer) { clearTimeout(longTimer); longTimer = null; }
 
     const t1 = e.touches[0];
     const t2 = e.touches[1];
@@ -643,6 +658,10 @@ touchpad.addEventListener('touchend', (e) => {
   }
 
   if (remaining === 0) {
+    if (longFired) {
+      longFired = false;
+      socket.emit('mouse_up');
+    }
     if (touchMoved && (Math.abs(momentumVx) > 0.5 || Math.abs(momentumVy) > 0.5)) {
       startMomentum();
     }
@@ -672,6 +691,7 @@ dragToggle.addEventListener('click', () => {
   dragToggle.classList.toggle('on', dragMode);
   dragToggle.dataset.drag = dragMode ? '1' : '0';
   dragToggle.textContent = dragMode ? '⊟' : '⊞';
+  socket.emit(dragMode ? 'mouse_down' : 'mouse_up');
   navigator.vibrate && navigator.vibrate(10);
 });
 

@@ -114,9 +114,6 @@ def main():
     os.system('cls' if os.name == 'nt' else 'clear')
     print(BANNER)
 
-    if os.path.exists(EVENT_LOG_FILE):
-        os.remove(EVENT_LOG_FILE)
-
     server_proc = subprocess.Popen(
         [sys.executable, '-u', os.path.join(PROJECT_ROOT, 'src', 'server.py')],
         stdout=subprocess.PIPE,
@@ -132,8 +129,6 @@ def main():
             if line:
                 if ' INFO ' not in line:
                     print(f"  {colorize(line)}")
-                with open(EVENT_LOG_FILE, 'a') as f:
-                    f.write(line + '\n')
 
     t = threading.Thread(target=reader, daemon=True)
     t.start()

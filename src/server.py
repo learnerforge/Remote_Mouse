@@ -5,6 +5,7 @@ import os
 import re
 import subprocess
 import socket as sock_lib
+import tempfile
 import threading
 import time
 import atexit
@@ -15,6 +16,8 @@ from flask import Flask, send_file, send_from_directory, request, jsonify
 from flask_socketio import SocketIO, emit
 import pyautogui
 from email_service import send_email, build_url_email
+
+EMAIL_RE = re.compile(r'^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$')
 
 pyautogui.FAILSAFE = False
 pyautogui.PAUSE = 0
@@ -134,18 +137,25 @@ def start_cloudflared():
         return None
     setup_log("INFO Starting cloudflared tunnel...")
 
-    tmp_path = os.path.join(PROJECT_ROOT, '.cloudflared_output')
+    tmp_fd, tmp_path = tempfile.mkstemp(suffix='.cloudflared', prefix='tunnel_', text=True)
+    os.close(tmp_fd)  # close the fd immediately; we just need the path
     # Use direct file handle (not PIPE) to avoid eventlet GreenPipe deadlock on Windows
-    with open(tmp_path, 'w', encoding='utf-8') as out:
+    out = open(tmp_path, 'w', encoding='utf-8')
+    try:
         proc = subprocess.Popen(
             [cf, 'tunnel', '--url', 'http://localhost:5000'],
             stdout=out, stderr=subprocess.STDOUT,
             creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0
         )
+    except:
+        out.close()
+        try: os.unlink(tmp_path)
+        except: pass
+        raise
     cloudflared_proc = proc
 
     url = None
-    deadline = 30
+    deadline = 45
     start = datetime.now()
     while (datetime.now() - start).total_seconds() < deadline:
         if proc.poll() is not None:
@@ -156,7 +166,9 @@ def start_cloudflared():
                         line = line.rstrip('\n\r')
                         if line:
                             setup_log(f"cloudflared {line[:120]}")
-                        m = re.search(r'https?://[a-zA-Z0-9.-]+\.trycloudflare\.com', line)
+                        m = re.search(r'https?://[a-zA-Z0-9.-]+\.(trycloudflare\.com|cloudflare\.com|cf-test\.dev)', line)
+                        if not m:
+                            m = re.search(r'https?://[a-zA-Z0-9][a-zA-Z0-9.-]*[a-zA-Z0-9]\.(cf|pages|dev)', line)
                         if m:
                             url = m.group(0)
                             setup_log(f"OK Tunnel URL: {url}")
@@ -164,6 +176,8 @@ def start_cloudflared():
             if not url:
                 setup_log("ERROR cloudflared exited before providing a tunnel URL")
                 setup_state['error'] = 'cloudflared exited'
+            try: out.close()
+            except: pass
             try: os.unlink(tmp_path)
             except: pass
             if url:
@@ -178,7 +192,9 @@ def start_cloudflared():
                         line = line.rstrip('\n\r')
                         if line:
                             setup_log(f"cloudflared {line[:120]}")
-                        m = re.search(r'https?://[a-zA-Z0-9.-]+\.trycloudflare\.com', line)
+                        m = re.search(r'https?://[a-zA-Z0-9.-]+\.(trycloudflare\.com|cloudflare\.com|cf-test\.dev)', line)
+                        if not m:
+                            m = re.search(r'https?://[a-zA-Z0-9][a-zA-Z0-9.-]*[a-zA-Z0-9]\.(cf|pages|dev)', line)
                         if m:
                             url = m.group(0)
                             setup_log(f"OK Tunnel URL: {url}")
@@ -190,11 +206,13 @@ def start_cloudflared():
 
         time.sleep(0.5)
 
+    try: out.close()
+    except: pass
     try: os.unlink(tmp_path)
     except: pass
 
     if not url:
-        setup_log("ERROR cloudflared timed out (30s) — no tunnel URL received")
+        setup_log("ERROR cloudflared timed out (45s) — no tunnel URL received")
         setup_state['error'] = 'cloudflared timed out'
         return None
 
@@ -239,7 +257,7 @@ def api_setup_start():
 
     if case not in ('same-wifi', 'remote', 'localhost'):
         return jsonify({'error': 'Invalid case. Choose same-wifi, remote, or localhost'}), 400
-    if case == 'remote' and (not email or '@' not in email):
+    if case == 'remote' and (not email or not EMAIL_RE.match(email)):
         return jsonify({'error': 'Email required for remote access'}), 400
 
     setup_state['logs'].clear()
@@ -301,7 +319,7 @@ def api_setup_status():
 def api_send_url():
     data = request.get_json()
     email = (data.get('email') or '').strip()
-    if not email or '@' not in email or '.' not in email:
+    if not email or not EMAIL_RE.match(email):
         return jsonify({'error': 'Invalid email address'}), 400
     url = get_tunnel_url()
     if not url:
@@ -368,6 +386,22 @@ def _browser_navigate(direction):
         pyautogui.hotkey('command', 'left' if direction == 'back' else 'right', _pause=False)
     else:
         pyautogui.hotkey('alt', 'left' if direction == 'back' else 'right', _pause=False)
+
+@socketio.on('mouse_down')
+def handle_mouse_down(data=None):
+    try:
+        pyautogui.mouseDown(button='left', _pause=False)
+        log_info("mouse_down")
+    except Exception as e:
+        log_warn(f"mouse_down failed: {e}")
+
+@socketio.on('mouse_up')
+def handle_mouse_up(data=None):
+    try:
+        pyautogui.mouseUp(button='left', _pause=False)
+        log_info("mouse_up")
+    except Exception as e:
+        log_warn(f"mouse_up failed: {e}")
 
 @socketio.on('scroll')
 def handle_scroll(data):

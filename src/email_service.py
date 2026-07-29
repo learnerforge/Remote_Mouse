@@ -18,9 +18,18 @@ def load_env():
         with open(env_path) as f:
             for line in f:
                 line = line.strip()
-                if line and not line.startswith('#') and '=' in line:
+                if not line or line.startswith('#'):
+                    continue
+                if line.startswith('export '):
+                    line = line[7:].strip()
+                if '=' in line:
                     k, _, v = line.partition('=')
-                    env[k.strip()] = v.strip()
+                    k = k.strip()
+                    v = v.strip()
+                    # Strip surrounding quotes
+                    if len(v) >= 2 and v[0] in ('"', "'") and v[0] == v[-1]:
+                        v = v[1:-1]
+                    env[k] = v
     return env
 
 def send_email(recipient, subject, body_html):
