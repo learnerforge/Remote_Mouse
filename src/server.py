@@ -10,8 +10,11 @@ import threading
 import time
 import atexit
 import platform
+import secrets
+import functools
 from datetime import datetime
-from collections import deque
+import logging
+from collections import deque, defaultdict
 from flask import Flask, send_file, send_from_directory, request, jsonify
 from flask_socketio import SocketIO, emit
 import pyautogui
@@ -19,7 +22,7 @@ from email_service import send_email, build_url_email
 
 EMAIL_RE = re.compile(r'^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$')
 
-pyautogui.FAILSAFE = False
+pyautogui.FAILSAFE = True
 pyautogui.PAUSE = 0
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -28,26 +31,110 @@ STATIC_DIR = os.path.join(FRONTEND_DIR, 'static')
 
 app = Flask(__name__, static_folder=None)
 app.config['SECRET_KEY'] = os.urandom(24).hex()
-socketio = SocketIO(app, async_mode='eventlet', cors_allowed_origins="*", ping_interval=5, ping_timeout=3)
+
+def allowed_origin(origin):
+    if not origin:
+        return False
+    allowed = {
+        'http://localhost:5000',
+        'http://127.0.0.1:5000',
+        f'http://{get_local_ip()}:5000',
+    }
+    tunnel = get_tunnel_url()
+    if tunnel:
+        allowed.add(tunnel)
+        allowed.add(tunnel.replace('https://', 'http://'))
+    return origin in allowed
+
+socketio = SocketIO(app, async_mode='eventlet', cors_allowed_origins=allowed_origin,
+                    max_http_buffer_size=65536,
+                    ping_interval=5, ping_timeout=3)
 
 TUNNEL_URL_FILE = os.path.join(PROJECT_ROOT, '.tunnel_url')
-EVENT_LOG_FILE = os.path.join(PROJECT_ROOT, 'events.log')
+
 cloudflared_proc = None
+PAIRING_CODE = secrets.token_hex(3)
+PAIRING_EXPIRY = 300
+paired_sessions = {}
 
-def _log(level, msg):
-    ts = datetime.now().strftime('%H:%M:%S')
-    line = f"[{ts}] {level} {msg}"
-    print(line, flush=True)
-    try:
-        with open(EVENT_LOG_FILE, 'a') as f:
-            f.write(line + '\n')
-    except Exception as e:
-        fallback = f"[{ts}] ERROR Failed to write to {EVENT_LOG_FILE}: {e}"
-        print(fallback, flush=True)
+# PII redaction filter
+class PIIRedactFilter(logging.Filter):
+    EMAIL_RE = re.compile(r'\b[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}\b')
+    URL_RE = re.compile(r'https?://[^\s]+')
+    IP_RE = re.compile(r'\b(?!127\.)(?:\d{1,3}\.){3}\d{1,3}\b')
 
-def log_ok(msg):   _log('OK', msg)
-def log_info(msg): _log('INFO', msg)
-def log_warn(msg): _log('WARN', msg)
+    def filter(self, record):
+        msg = record.getMessage()
+        msg = self.EMAIL_RE.sub('<email>', msg)
+        msg = self.URL_RE.sub('<url>', msg)
+        msg = self.IP_RE.sub('<ip>', msg)
+        record.msg = msg
+        record.args = ()
+        return True
+
+# Setup logging
+LOG_DIR = os.path.join(PROJECT_ROOT, '.remote_mouse_logs')
+os.makedirs(LOG_DIR, mode=0o700, exist_ok=True)
+LOG_FILE = os.path.join(LOG_DIR, 'events.log')
+
+logger = logging.getLogger('remote_mouse')
+logger.setLevel(logging.DEBUG)
+
+file_handler = logging.FileHandler(LOG_FILE)
+file_handler.setLevel(logging.DEBUG)
+file_handler.addFilter(PIIRedactFilter())
+file_handler.setFormatter(logging.Formatter('%(asctime)s %(levelname)s %(message)s', datefmt='%H:%M:%S'))
+
+console_handler = logging.StreamHandler()
+console_handler.setLevel(logging.DEBUG)
+console_handler.setFormatter(logging.Formatter('[%(asctime)s] %(levelname)s %(message)s', datefmt='%H:%M:%S'))
+
+logger.addHandler(file_handler)
+logger.addHandler(console_handler)
+
+def log_ok(msg):   logger.info(msg)
+def log_info(msg): logger.debug(msg)
+def log_warn(msg): logger.warning(msg)
+
+# Action allowlist — only these socket events are permitted
+ALLOWED_ACTIONS = {
+    'mouse_move', 'mouse_abs', 'click', 'scroll', 'media',
+    'mouse_down', 'mouse_up', 'request_tunnel_url', 'disconnect'
+}
+
+# Blocked key combinations (OS-level dangerous combos)
+BLOCKED_KEYS = {
+    'ctrl+alt+del', 'ctrl+shift+esc', 'alt+f4', 'win+l',
+    'win+r', 'win+x', 'win+d', 'alt+tab', 'ctrl+alt+tab',
+}
+
+class RateLimiter:
+    def __init__(self, max_calls=30, window=1.0):
+        self.max_calls = max_calls
+        self.window = window
+        self._buckets = defaultdict(lambda: defaultdict(list))
+
+    def check(self, sid, action):
+        now = time.monotonic()
+        key = action
+        dq = self._buckets[sid][key]
+        while dq and dq[0] < now - self.window:
+            dq.pop(0)
+        if len(dq) >= self.max_calls:
+            return False
+        dq.append(now)
+        return True
+
+    def cleanup(self, sid):
+        self._buckets.pop(sid, None)
+
+rate_limiter = RateLimiter(max_calls=30, window=1.0)
+
+def validate_action(action):
+    if action not in ALLOWED_ACTIONS:
+        log_warn(f"Blocked unknown action: {action}")
+        return False
+    return True
 
 def get_local_ip():
     s = sock_lib.socket(sock_lib.AF_INET, sock_lib.SOCK_DGRAM)
@@ -95,22 +182,24 @@ def setup_log(msg):
     print(line, flush=True)
 
 def find_cloudflared():
-    candidates = ['cloudflared', 'cloudflared.exe']
-    for c in candidates:
-        try:
-            r = subprocess.run([c, '--version'], capture_output=True, text=True, timeout=5)
-            if r.returncode == 0:
-                return c
-        except (FileNotFoundError, subprocess.TimeoutExpired):
-            pass
-    extra = [
+    path = None
+    # Use shutil.which for PATH resolution
+    try:
+        import shutil
+        path = shutil.which('cloudflared') or shutil.which('cloudflared.exe')
+    except Exception:
+        pass
+    if path:
+        return path
+    # Fallback: check common locations
+    candidates = [
         os.path.expanduser('~/.cloudflared/cloudflared.exe'),
         r'C:\Program Files\cloudflared\cloudflared.exe',
         r'C:\tools\cloudflared\cloudflared.exe',
         '/usr/local/bin/cloudflared',
         '/usr/bin/cloudflared',
     ]
-    for p in extra:
+    for p in candidates:
         if os.path.exists(p):
             return p
     return None
@@ -145,6 +234,7 @@ def start_cloudflared():
         proc = subprocess.Popen(
             [cf, 'tunnel', '--url', 'http://localhost:5000'],
             stdout=out, stderr=subprocess.STDOUT,
+            stdin=subprocess.DEVNULL,
             creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0
         )
     except:
@@ -220,6 +310,16 @@ def start_cloudflared():
         f.write(url + '\n')
     return url
 
+@app.after_request
+def add_security_headers(resp):
+    resp.headers['X-Frame-Options'] = 'DENY'
+    resp.headers['X-Content-Type-Options'] = 'nosniff'
+    resp.headers['X-XSS-Protection'] = '0'
+    resp.headers['Content-Security-Policy'] = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; frame-ancestors 'none'"
+    resp.headers['Referrer-Policy'] = 'no-referrer'
+    resp.headers['Permissions-Policy'] = 'geolocation=(), microphone=(), camera=()'
+    return resp
+
 @app.route('/')
 def index():
     resp = send_file(os.path.join(FRONTEND_DIR, 'index.html'))
@@ -230,8 +330,12 @@ def index():
 def favicon():
     return '', 204
 
+ALLOWED_STATIC_EXTS = ('.js', '.css', '.png', '.ico', '.svg', '.json', '.map')
 @app.route('/static/<path:filename>')
 def static_files(filename):
+    if not filename.lower().endswith(ALLOWED_STATIC_EXTS):
+        log_warn(f"Blocked static file access: {filename}")
+        return '', 404
     resp = send_from_directory(STATIC_DIR, filename)
     resp.headers['Cache-Control'] = 'public, max-age=86400'
     return resp
@@ -332,28 +436,88 @@ def api_send_url():
     except Exception as e:
         return jsonify({'error': f'Failed to send email: {str(e)}'}), 500
 
+@app.route('/api/pairing-code')
+def api_pairing_code():
+    return jsonify({'code': PAIRING_CODE})
+
+def with_ratelimit(action):
+    def decorator(f):
+        @functools.wraps(f)
+        def wrapper(*args, **kwargs):
+            if not validate_action(action):
+                return
+            if not rate_limiter.check(request.sid, action):
+                log_warn(f"Rate limit exceeded: {action}")
+                return
+            return f(*args, **kwargs)
+        return wrapper
+    return decorator
+
+def require_auth():
+    sid = request.sid
+    if sid not in paired_sessions:
+        return False
+    return bool(paired_sessions[sid].get('token'))
+
 @socketio.on('connect')
-def handle_connect():
+def handle_connect(auth):
+    rate_limiter.cleanup(request.sid)
+    token = (auth or {}).get('token', '')
+    is_paired = False
+    if token:
+        for s in paired_sessions.values():
+            if s.get('token') == token:
+                is_paired = True
+                break
+        if not is_paired:
+            log_warn("Rejected connection with invalid token")
+            raise ConnectionRefusedError('unauthorized')
+
+    paired_sessions[request.sid] = paired_sessions.get(request.sid, {})
+    paired_sessions[request.sid]['connected'] = True
+    if token:
+        paired_sessions[request.sid]['token'] = token
+        log_ok("Client connected (authenticated)")
+    else:
+        log_info("Client connected (unauthenticated)")
+
     w, h = pyautogui.size()
-    log_ok("Client connected")
     emit('screen_info', {
         'width': w, 'height': h,
         'ip': get_local_ip(),
         'tunnel_url': get_tunnel_url() or ''
     })
 
+@socketio.on('pair')
+def handle_pair(data):
+    code = (data or {}).get('code', '')
+    if code == PAIRING_CODE:
+        token = secrets.token_urlsafe(32)
+        paired_sessions[request.sid] = {'token': token, 'paired_at': time.time(), 'connected': True}
+        emit('paired', {'token': token})
+        log_ok("Client paired successfully")
+    else:
+        emit('pair_error', {'message': 'Invalid pairing code'})
+        log_warn("Failed pairing attempt")
+
 @socketio.on('disconnect')
 def handle_disconnect():
+    rate_limiter.cleanup(request.sid)
+    paired_sessions.pop(request.sid, None)
     log_info("Client disconnected")
 
 @socketio.on('request_tunnel_url')
+@with_ratelimit('request_tunnel_url')
 def handle_request_tunnel_url():
+    if not require_auth(): return
     url = get_tunnel_url()
     if url:
         emit('tunnel_url', {'url': url})
 
 @socketio.on('mouse_move')
+@with_ratelimit('mouse_move')
 def handle_move(data):
+    if not require_auth(): return
     dx = data.get('dx', 0)
     dy = data.get('dy', 0)
     if dx != 0 or dy != 0:
@@ -361,7 +525,9 @@ def handle_move(data):
         log_info(f"move ({dx:+04}, {dy:+04})")
 
 @socketio.on('mouse_abs')
+@with_ratelimit('mouse_abs')
 def handle_mouse_abs(data):
+    if not require_auth(): return
     w, h = pyautogui.size()
     x = max(0, min(w, int(data.get('x', 0))))
     y = max(0, min(h, int(data.get('y', 0))))
@@ -369,7 +535,9 @@ def handle_mouse_abs(data):
     log_info(f"abs  ({x:04}, {y:04})")
 
 @socketio.on('click')
+@with_ratelimit('click')
 def handle_click(data):
+    if not require_auth(): return
     button = data.get('button', 'left')
     if button in ('back', 'forward'):
         _browser_navigate(button)
@@ -379,6 +547,10 @@ def handle_click(data):
 
 
 def _browser_navigate(direction):
+    combo = f"alt+{'left' if direction == 'back' else 'right'}"
+    if combo in BLOCKED_KEYS:
+        log_warn(f"Blocked dangerous key combo: {combo}")
+        return
     if platform.system() == 'Windows':
         key = 'browserback' if direction == 'back' else 'browserforward'
         pyautogui.press(key, _pause=False)
@@ -388,7 +560,9 @@ def _browser_navigate(direction):
         pyautogui.hotkey('alt', 'left' if direction == 'back' else 'right', _pause=False)
 
 @socketio.on('mouse_down')
+@with_ratelimit('mouse_down')
 def handle_mouse_down(data=None):
+    if not require_auth(): return
     try:
         pyautogui.mouseDown(button='left', _pause=False)
         log_info("mouse_down")
@@ -396,7 +570,9 @@ def handle_mouse_down(data=None):
         log_warn(f"mouse_down failed: {e}")
 
 @socketio.on('mouse_up')
+@with_ratelimit('mouse_up')
 def handle_mouse_up(data=None):
+    if not require_auth(): return
     try:
         pyautogui.mouseUp(button='left', _pause=False)
         log_info("mouse_up")
@@ -404,7 +580,9 @@ def handle_mouse_up(data=None):
         log_warn(f"mouse_up failed: {e}")
 
 @socketio.on('scroll')
+@with_ratelimit('scroll')
 def handle_scroll(data):
+    if not require_auth(): return
     dx = data.get('dx', 0)
     dy = data.get('dy', 0)
     if dy != 0:
@@ -417,7 +595,9 @@ def handle_scroll(data):
         log_info(f"scroll h({dx:+05})")
 
 @socketio.on('media')
+@with_ratelimit('media')
 def handle_media(data):
+    if not require_auth(): return
     action = data.get('action', '')
     key_map = {
         'play_pause': 'playpause',

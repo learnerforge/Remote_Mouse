@@ -8,6 +8,9 @@ __pycache__/
 events.log
 .tunnel_url
 .cloudflared_output
+.remote_mouse_logs/
+*.pem
+*.key
 version_control.md
 .DS_Store
 Thumbs.db
