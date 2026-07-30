@@ -43,6 +43,9 @@
 <tr><th>Problem</th><th>Quick Fix</th></tr>
 <tr><td></td><td></td></tr>
 <tr><td>Page won't load on phone</td><td>Check WiFi / same network / firewall</td></tr>
+<tr><td>"Unauthorized" / "Connection refused"</td><td>Enter the pairing code shown on laptop terminal</td></tr>
+<tr><td>Where is the pairing code?</td><td>It's printed on the terminal when the server starts — a 6-char hex code like <code>A3F9C2</code></td></tr>
+<tr><td>Connection keeps getting rejected?</td><td>The pairing code is valid for 5 minutes; restart the server for a fresh code</td></tr>
 <tr><td>WebSocket won't connect</td><td>Check server is running / correct URL</td></tr>
 <tr><td>Mouse moves but lags</td><td>Reduce sensitivity / check network latency</td></tr>
 <tr><td>Clicks not working</td><td>Check server logs / pyautogui permissions</td></tr>
@@ -126,6 +129,43 @@
 <tr><td>Disable ad blocker</td><td>Some block WebSocket connections</td></tr>
 <tr><td>Disable VPN</td><td>VPN routes traffic away from LAN</td></tr>
 </table>
+
+<hr>
+
+<h3>Pairing Authentication Issues</h3>
+
+<h4>Decision Tree: "Unauthorized" Error</h4>
+
+<pre class="mermaid">graph TD
+    START[&quot;Showing &#x27;Unauthorized&#x27; or&lt;br/&gt;&#x27;Connection refused&#x27; error&quot;] --&gt; CODE{&quot;Pairing code shown&lt;br/&gt;on phone screen?&quot;}
+
+    CODE -- No --&gt; FETCH[&quot;Client fetches code from&lt;br/&gt;/api/pairing-code at page load&quot;]
+    CODE -- Yes --&gt; MATCH{&quot;Code matches terminal?&quot;}
+
+    MATCH -- No --&gt; RETYPE[&quot;Re-enter the 6-char hex code&lt;br/&gt;exactly as shown on laptop terminal&lt;br/&gt;Codes are case-insensitive&quot;]
+    MATCH -- Yes --&gt; TIMEOUT{&quot;Still failing?&quot;}
+
+    TIMEOUT -- Yes --&gt; RESTART[&quot;Restart the server&lt;br/&gt;A fresh pairing code is generated&lt;br/&gt;on every server start&quot;]
+    TIMEOUT -- No --&gt; READY[&quot;Pairing successful — start controlling!&quot;]</pre>
+
+<h4>Where to Find the Pairing Code</h4>
+
+<p>The 6-char pairing code (e.g., <code>A3F9C2</code>) is:</p>
+<ul>
+<li>Generated automatically by <code>secrets.token_hex(3).upper()</code> in <code>server.py</code></li>
+<li>Printed to the terminal when the server starts (CLI output)</li>
+<li>Exposed at <code>GET /api/pairing-code</code> for the frontend to read</li>
+<li>Visible in the pairing overlay on the phone (fetched automatically from <code>/api/pairing-code</code>)</li>
+</ul>
+
+<h4>Pairing Code Expiry</h4>
+
+<p>The pairing code has a 5-minute window (<code>PAIRING_EXPIRY = 300</code> seconds). If the code expires:</p>
+<ol>
+<li>The server keeps running but new pairing attempts will fail</li>
+<li>Restart the server to generate a fresh code, or</li>
+<li>Check the setup page (open <code>/setup</code> on your laptop) for a new code</li>
+</ol>
 
 <hr>
 

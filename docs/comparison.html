@@ -88,6 +88,25 @@ xychart-beta
 
 <hr>
 
+<h2>Security Comparison</h2>
+
+<table>
+<tr><th>#</th><th>Security Feature</th><th>Wired Mouse</th><th>Remote Mouse v1.0.0</th></tr>
+<tr><td></td><td></td><td></td><td></td></tr>
+<tr><td>1</td><td>Pairing authentication</td><td>None (plug-and-play)</td><td>6-char hex code + session token via Socket.IO</td></tr>
+<tr><td>2</td><td>Rate limiting</td><td>N/A (hardware HID)</td><td>30 calls/s per action per session</td></tr>
+<tr><td>3</td><td>Action allowlist</td><td>N/A</td><td>Only approved socket events processed; unknown dropped</td></tr>
+<tr><td>4</td><td>CORS validation</td><td>N/A</td><td>Dynamic allowlist (localhost, LAN IP, tunnel URL)</td></tr>
+<tr><td>5</td><td>Key blocklist</td><td>N/A</td><td>9 dangerous OS combos blocked server-side</td></tr>
+<tr><td>6</td><td>Security headers</td><td>N/A</td><td>X-Frame-Options, CSP, X-Content-Type-Options, Referrer-Policy, Permissions-Policy</td></tr>
+<tr><td>7</td><td>PII redaction</td><td>N/A</td><td>Emails, URLs, IPs redacted from logs</td></tr>
+<tr><td>8</td><td>Static file whitelist</td><td>N/A</td><td>Only <code>.js</code>, <code>.css</code>, <code>.png</code>, <code>.ico</code>, <code>.svg</code>, <code>.json</code>, <code>.map</code> served</td></tr>
+<tr><td>9</td><td>pyautogui safety</td><td>N/A</td><td><code>FAILSAFE=True</code> (mouse corner raises exception)</td></tr>
+<tr><td>10</td><td>Dependency pinning</td><td>N/A</td><td>Exact versions in <code>requirements.txt</code></td></tr>
+</table>
+
+<hr>
+
 <h2>Score Distribution</h2>
 
 <pre class="mermaid">%%{init: {&#x27;theme&#x27;: &#x27;dark&#x27;, &#x27;themeVariables&#x27;: { &#x27;darkMode&#x27;: true }}}%%

@@ -41,7 +41,7 @@
 
 <p>Remote Mouse follows a simple client-server architecture. The Python server runs on the laptop and serves a web page. The phone connects over WebSocket and sends touch events. The server translates those into OS-level mouse and keyboard actions via <code>pyautogui</code>.</p>
 
-<p>There is no database, no persistent storage (beyond <code>events.log</code> and <code>.tunnel_url</code>), and no authentication. The design prioritizes zero phone installation and minimal latency.</p>
+<p>There is no database and no persistent storage beyond <code>events.log</code> and <code>.tunnel_url</code>. The design prioritizes zero phone installation and minimal latency while incorporating layered security: pairing authentication, rate limiting, action allowlisting, CORS validation, PII redaction, and security headers.</p>
 
 <h3>Project Structure</h3>
 
@@ -171,8 +171,9 @@
         end
 
         subgraph WS[&quot;WebSocket Layer (Flask-SocketIO)&quot;]
-            CONN[&quot;connect&lt;br/&gt;→ screen_info&quot;]
+            CONN[&quot;connect (auth)&lt;br/&gt;→ screen_info&quot;]
             DISCONN[&quot;disconnect&quot;]
+            PAIR[&quot;pair&lt;br/&gt;→ paired / pair_error&quot;]
             MOVE[&quot;mouse_move&lt;br/&gt;→ pyautogui.moveRel&quot;]
             CLICK[&quot;click&lt;br/&gt;→ pyautogui.click&quot;]
             SCROLL[&quot;scroll&lt;br/&gt;→ pyautogui.scroll&quot;]
@@ -181,10 +182,17 @@
         end
 
         subgraph SYS[&quot;System Integration&quot;]
-            PYGUY[&quot;pyautogui&lt;br/&gt;FAILSAFE=False, PAUSE=0&quot;]
-            CF_MGR[&quot;cloudflared Manager&lt;br/&gt;find → start → monitor (30s timeout)&quot;]
-            LOGGER[&quot;Logger&lt;br/&gt;_log() → stdout + events.log&quot;]
+            PYGUY[&quot;pyautogui&lt;br/&gt;FAILSAFE=True, PAUSE=0&quot;]
+            CF_MGR[&quot;cloudflared Manager&lt;br/&gt;find → start → monitor (45s timeout)&quot;]
+            LOGGER[&quot;Logger&lt;br/&gt;PIIRedactFilter → stdout + events.log&quot;]
             SETUP_STATE[&quot;Setup State&lt;br/&gt;deque(maxlen=100)&quot;]
+        end
+        subgraph SEC[&quot;Security Layer&quot;]
+            RATE[&quot;RateLimiter&lt;br/&gt;30 calls/s per action per session&quot;]
+            ALLOW[&quot;ALLOWED_ACTIONS&lt;br/&gt;action allowlist&quot;]
+            BLOCK[&quot;BLOCKED_KEYS&lt;br/&gt;dangerous OS combos&quot;]
+            CORS[&quot;allowed_origin()&lt;br/&gt;dynamic CORS validation&quot;]
+            HEADERS[&quot;@app.after_request&lt;br/&gt;security headers&quot;]
         end
 
         WS --&gt; PYGUY
@@ -200,14 +208,20 @@
 <table>
 <tr><th>Event</th><th>Handler</th><th>Action</th></tr>
 <tr><td></td><td></td><td></td></tr>
-<tr><td><code>connect</code></td><td><code>handle_connect</code></td><td>Send screen dimensions, local IP, tunnel URL</td></tr>
-<tr><td><code>disconnect</code></td><td><code>handle_disconnect</code></td><td>Log disconnection</td></tr>
-<tr><td><code>mouse_move</code></td><td><code>handle_move</code></td><td><code>pyautogui.moveRel(dx, dy)</code></td></tr>
-<tr><td><code>click</code></td><td><code>handle_click</code></td><td><code>pyautogui.click(button)</code></td></tr>
-<tr><td><code>scroll</code></td><td><code>handle_scroll</code></td><td><code>pyautogui.scroll(clicks)</code> — converts px to notches</td></tr>
-<tr><td><code>media</code></td><td><code>handle_media</code></td><td><code>pyautogui.press(playpause/nexttrack/etc.)</code></td></tr>
-<tr><td><code>request_tunnel_url</code></td><td><code>handle_request_tunnel_url</code></td><td>Emit current tunnel URL</td></tr>
+<tr><td><code>connect</code></td><td><code>handle_connect</code></td><td>Validate auth token; send screen dimensions, local IP, tunnel URL</td></tr>
+<tr><td><code>disconnect</code></td><td><code>handle_disconnect</code></td><td>Cleanup rate limiter, remove session, log disconnection</td></tr>
+<tr><td><code>pair</code></td><td><code>handle_pair</code></td><td>Validate 6-char pairing code; emit <code>paired</code> with session token or <code>pair_error</code></td></tr>
+<tr><td><code>mouse_move</code></td><td><code>handle_move</code></td><td><code>pyautogui.moveRel(dx, dy)</code> (requires paired session)</td></tr>
+<tr><td><code>mouse_abs</code></td><td><code>handle_mouse_abs</code></td><td><code>pyautogui.moveTo(x, y)</code> (absolute positioning)</td></tr>
+<tr><td><code>click</code></td><td><code>handle_click</code></td><td><code>pyautogui.click(button)</code> (requires paired session)</td></tr>
+<tr><td><code>scroll</code></td><td><code>handle_scroll</code></td><td><code>pyautogui.scroll(clicks)</code> — converts px to notches (requires paired session)</td></tr>
+<tr><td><code>media</code></td><td><code>handle_media</code></td><td><code>pyautogui.press(playpause/nexttrack/etc.)</code> (requires paired session)</td></tr>
+<tr><td><code>mouse_down</code></td><td><code>handle_mouse_down</code></td><td><code>pyautogui.mouseDown(button='left')</code></td></tr>
+<tr><td><code>mouse_up</code></td><td><code>handle_mouse_up</code></td><td><code>pyautogui.mouseUp(button='left')</code></td></tr>
+<tr><td><code>request_tunnel_url</code></td><td><code>handle_request_tunnel_url</code></td><td>Emit current tunnel URL (requires paired session)</td></tr>
 </table>
+
+<p><strong>All event handlers</strong> are gated by <code>@with_ratelimit</code> (30 calls/s per action) and most require a paired session via <code>require_auth()</code>. Unknown events are silently dropped by the <code>ALLOWED_ACTIONS</code> allowlist.</p>
 
 <h4>Design Decisions</h4>
 
@@ -218,9 +232,9 @@
 <tr><td><strong>static_folder=None</strong></td><td>Bypasses Flask 3.0's built-in handler which intercepts <code>/static/</code> before our route</td></tr>
 <tr><td><strong>Cache-Control: no-cache</strong> on HTML</td><td>Prevents cached stale frontend</td></tr>
 <tr><td><strong>Cache-Control: max-age=86400</strong> on static</td><td>socket.io.min.js cached 24h on phone</td></tr>
-<tr><td><strong>pyautogui.FAILSAFE = False</strong></td><td>Prevents corner-movement crash</td></tr>
+<tr><td><strong>pyautogui.FAILSAFE = True</strong></td><td>Safety re-enabled: mouse in screen corner raises exception to stop runaway cursor</td></tr>
 <tr><td><strong>pyautogui.PAUSE = 0</strong></td><td>Removes 100ms built-in delay between calls</td></tr>
-<tr><td><strong>cloudflared via subprocess.Popen</strong></td><td>Non-blocking tunnel management; 30s timeout with regex URL detection</td></tr>
+<tr><td><strong>cloudflared via subprocess.Popen</strong></td><td>Non-blocking tunnel management; 45s timeout with regex URL detection</td></tr>
 </table>
 
 <h3>3. CLI Control Panel (<code>src/cli.py</code>)</h3>
@@ -446,11 +460,11 @@
 
 <h2>Logging Architecture</h2>
 
-<pre class="mermaid">graph TB
+    <pre class="mermaid">graph TB
     subgraph Server[&quot;server.py&quot;]
-        LOG[&quot;_log(level, msg)&quot;]
-        STDOUT[&quot;print(msg, flush=True)&quot;]
-        FILE[&quot;events.log (append)&quot;]
+        LOG[&quot;logging.Logger&lt;br/&gt;(PIIRedactFilter applied)&quot;]
+        STDOUT[&quot;StreamHandler → stdout&quot;]
+        FILE[&quot;FileHandler&lt;br/&gt;.remote_mouse_logs/events.log&quot;]
         LOG --&gt; STDOUT
         LOG --&gt; FILE
     end
@@ -471,24 +485,70 @@
         SETUP_LOG --&gt; SETUP_QUEUE
     end</pre>
 
+<p>All log output passes through <code>PIIRedactFilter</code>, which redacts email addresses, URLs, and non-loopback IP addresses before writing to file or displaying to console. Logs are stored in <code>.remote_mouse_logs/events.log</code> (directory created with <code>0o700</code> permissions).</p>
+
 <hr>
 
 <h2>Security Model</h2>
 
-<p>Remote Mouse has <strong>no authentication</strong>. Security relies on:</p>
+<p>Remote Mouse uses a <strong>layered security model</strong> with authentication, rate limiting, input validation, and data redaction:</p>
 
-<ol>
-<li><strong>Network segmentation</strong> — accessible to anyone on the local network (binds <code>0.0.0.0:5000</code>)</li>
-<li><strong>URL randomness</strong> — Cloudflare tunnel URLs have ~64-bit entropy</li>
-<li><strong>URL volatility</strong> — tunnel URL invalid when cloudflared stops</li>
-<li><strong>Trust model</strong> — designed for personal use on trusted networks</li>
-</ol>
-
-<p>For additional security, consider:</p>
+<h3>1. Pairing Authentication</h3>
 <ul>
-<li>Running behind a reverse proxy with basic auth</li>
-<li>Firewall rules restricting access to specific IPs</li>
-<li>Binding to a specific interface instead of <code>0.0.0.0</code></li>
+<li>A 6-char hex code (<code>PAIRING_CODE</code>) is generated at server start via <code>secrets.token_hex(3).upper()</code></li>
+<li>Printed to terminal and exposed at <code>GET /api/pairing-code</code></li>
+<li>Client submits the code via the <code>pair</code> socket event; server returns <code>paired</code> with a session token or <code>pair_error</code></li>
+<li>All mouse/keyboard socket handlers call <code>require_auth()</code> and reject unpaired sessions</li>
+<li>Token is stored in <code>localStorage</code> as <code>rm_token</code> and sent on reconnect for persistent auth</li>
+</ul>
+
+<h3>2. Rate Limiting (<code>RateLimiter</code>)</h3>
+<ul>
+<li>Per-action, per-session token bucket: <code>max_calls=30</code>, <code>window=1.0s</code></li>
+<li>The <code>@with_ratelimit</code> decorator wraps all socket handlers</li>
+<li>Exceeded calls are silently dropped (no emit back to client)</li>
+</ul>
+
+<h3>3. Action Allowlist (<code>ALLOWED_ACTIONS</code>)</h3>
+<ul>
+<li>Only known event names are processed; unknown socket events are <code>log_warn</code>-ed and dropped</li>
+<li>Allows: <code>mouse_move</code>, <code>mouse_abs</code>, <code>click</code>, <code>scroll</code>, <code>media</code>, <code>mouse_down</code>, <code>mouse_up</code>, <code>request_tunnel_url</code>, <code>disconnect</code></li>
+</ul>
+
+<h3>4. Key Blocklist (<code>BLOCKED_KEYS</code>)</h3>
+<ul>
+<li>Dangerous OS combos are blocked before pyautogui execution</li>
+<li>Blocked: <code>ctrl+alt+del</code>, <code>ctrl+shift+esc</code>, <code>alt+f4</code>, <code>win+l</code>, <code>win+r</code>, <code>win+x</code>, <code>win+d</code>, <code>alt+tab</code>, <code>ctrl+alt+tab</code></li>
+<li>Blocked attempts are logged as warnings</li>
+</ul>
+
+<h3>5. CORS Validation (<code>allowed_origin</code>)</h3>
+<ul>
+<li>Dynamic function replaces the wildcard <code>"*"</code> on <code>cors_allowed_origins</code></li>
+<li>Accepts: <code>http://localhost:5000</code>, <code>http://127.0.0.1:5000</code>, <code>http://{LAN_IP}:5000</code>, and the active tunnel URL</li>
+<li>All other origins receive HTTP 403</li>
+</ul>
+
+<h3>6. Security Headers</h3>
+<p>Applied on every response via <code>@app.after_request</code>:</p>
+<pre><code>X-Frame-Options: DENY
+X-Content-Type-Options: nosniff
+X-XSS-Protection: 0
+Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; frame-ancestors 'none'
+Referrer-Policy: no-referrer
+Permissions-Policy: geolocation=(), microphone=(), camera=()</code></pre>
+
+<h3>7. PII Redaction (<code>PIIRedactFilter</code>)</h3>
+<ul>
+<li>A custom <code>logging.Filter</code> subclass redacts emails, URLs, and IPv4 addresses (excluding 127.0.0.1)</li>
+<li>Attached to both the file handler (<code>.remote_mouse_logs/events.log</code>) and stdout handler</li>
+<li>Redacted text replaced with <code>&lt;email&gt;</code>, <code>&lt;url&gt;</code>, <code>&lt;ip&gt;</code></li>
+</ul>
+
+<h3>8. Static File Whitelist (<code>ALLOWED_STATIC_EXTS</code>)</h3>
+<ul>
+<li>Only <code>.js</code>, <code>.css</code>, <code>.png</code>, <code>.ico</code>, <code>.svg</code>, <code>.json</code>, <code>.map</code> extensions are served</li>
+<li>All other static file requests return 404</li>
 </ul>
 
 <hr>

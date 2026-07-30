@@ -33,14 +33,17 @@ server_proc = subprocess.Popen([sys.executable, '-u', server_script], ...)
 
 **Alternative considered:** `threading.Thread` — rejected due to Flask-SocketIO's documented instability with threads.
 
-## Why no authentication?
+## Why pairing auth?
 
-The project is designed for personal use on trusted networks. Adding authentication would:
-- Increase complexity for the 99% use case (personal LAN)
-- Require session management or token storage
-- Add friction to the setup wizard flow
+v1.1.0 introduced a pairing code system (6-char hex code, e.g. `A3F1B9`). At startup, the server generates a `PAIRING_CODE` displayed in the terminal. The client must send a `pair` event with this code within 60 seconds; the server responds with a session token stored in `localStorage`.
 
-**Safety mechanisms:** Random tunnel URLs (64-bit entropy), URL volatility (changes on restart), network segmentation.
+```python
+PAIRING_CODE = secrets.token_hex(3).upper()  # 6 hex chars
+```
+
+**Why not password-based?** A pairing code is single-use, volatile (invalidates on restart), and requires physical proximity to the laptop. This is stronger than a static password for the "personal device" threat model.
+
+**Flow:** Server starts → code printed → phone connects via WebSocket → sends `pair` event → validates → returns session token → all subsequent events require token via `@require_auth`.
 
 ## Why local socket.io?
 
@@ -51,19 +54,78 @@ The Socket.IO client library (49 KB minified) was originally loaded from CDN. On
 
 Serving it locally from `/static/` eliminates this entirely — the page loads in under 1 second.
 
-## Why `FAILSAFE=False` and `PAUSE=0`?
+## Why `FAILSAFE=True` and `PAUSE=0`?
 
 ```python
-pyautogui.FAILSAFE = False
+pyautogui.FAILSAFE = True
 pyautogui.PAUSE = 0
 ```
 
-- **FAILSAFE:** pyautogui's default failsafe throws an exception when the mouse reaches a screen corner. This is useful for emergencies but breaks remote control when the user moves the cursor quickly.
+- **FAILSAFE:** Re-enabled in v1.1.0 as a safety measure. The initial release (`FAILSAFE=False`) was a mistake — it disabled an emergency kill switch. With pairing auth now preventing unauthorized access, the failsafe can safely be re-enabled. If remote control goes haywire, moving the mouse to a screen corner kills the operation.
 - **PAUSE:** pyautogui adds a 100ms delay between every call by default. Setting to 0 removes this for responsive cursor movement.
 
 ## Why `deque(maxlen=200)` for logs?
 
 The in-memory log history uses a bounded deque to prevent unbounded memory growth during long sessions. The 200-entry limit keeps memory usage under ~50 KB while providing enough history for the CLI's `log` command.
+
+## Why rate limiting?
+
+Each authenticated session is limited to 30 calls per second per action type. The `@with_ratelimit('action_name')` decorator uses a token bucket per session-action pair:
+
+```python
+def with_ratelimit(action):
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(sid, *args, **kwargs):
+            if not ratelimit(sid, action, 30):
+                return
+            return func(sid, *args, **kwargs)
+        return wrapper
+```
+
+This prevents runaway loops (e.g., a stuck touch event firing 1000 moves/sec) and limits abuse potential.
+
+**Why not global rate limiting?** Per-session-per-action means one misbehaving client doesn't starve others, and different actions (move vs click) have independent budgets.
+
+## Why PII redaction?
+
+All log output passes through `PIIRedactFilter`, a logging filter that scrubs:
+- Email addresses (`user@example.com` → `***@***.com`)
+- URLs (`https://example.com/path` → `***`)
+- IPv4/IPv6 addresses (`192.168.1.1` → `***.***.***.***`)
+
+This ensures logs can be shared for debugging without exposing personal information. The filter is applied to both the `events.log` file handler and the stdout handler.
+
+## Why security headers?
+
+The Flask app sets these headers on every response:
+
+| Header | Value | Purpose |
+|--------|-------|---------|
+| `X-Frame-Options` | `DENY` | Prevents clickjacking |
+| `Content-Security-Policy` | `default-src 'self'` | Blocks inline scripts/XSS |
+| `X-Content-Type-Options` | `nosniff` | Prevents MIME sniffing |
+| `Referrer-Policy` | `no-referrer` | Disables referrer leakage |
+| `Permissions-Policy` | `camera=(), microphone=(), ...` | Disables sensor access |
+
+CSP is intentionally restrictive — the only scripts allowed are served from `/static/`. This means any injected script is blocked by the browser itself.
+
+## Why dynamic CORS?
+
+Instead of the common `CORS(app, origins="*")`, v1.1.0 uses a validation function:
+
+```python
+def allowed_origin(origin):
+    if not origin:
+        return False
+    if origin.startswith(('http://localhost', 'http://127.0.0.1')):
+        return True
+    if is_lan_ip(origin):
+        return True
+    return origin == tunnel_url
+```
+
+This ensures CORS is only granted to known-good origins: localhost, LAN IPs, and the current tunnel URL. The wildcard approach was a security gap — any website could have initiated a WebSocket connection.
 
 ## Why 30-second cloudflared timeout?
 

@@ -122,32 +122,57 @@ SMTP_PASSWORD=your-app-password</code></pre>
 
 <pre><code>app.config[&#x27;SECRET_KEY&#x27;] = os.urandom(24).hex()</code></pre>
 
-<p>Randomly generated on each server start. Used internally by Flask-SocketIO for session signing. Not security-critical since there is no authentication.</p>
+<p>Randomly generated on each server start. Used internally by Flask-SocketIO for session signing.</p>
+
+<h3>Pairing Code</h3>
+
+<pre><code>PAIRING_CODE = secrets.token_hex(3).upper()  # e.g. &quot;A3F9C2&quot;</code></pre>
+
+<p>Auto-generated on each server start. A 6-char hex code printed to the terminal and exposed at <code>GET /api/pairing-code</code>. No manual configuration needed — authentication is self-contained.</p>
 
 <h3>pyautogui Tuning</h3>
 
-<pre><code>pyautogui.FAILSAFE = False
+<pre><code>pyautogui.FAILSAFE = True
 pyautogui.PAUSE = 0</code></pre>
 
 <table>
 <tr><th>Setting</th><th>Default</th><th>Current</th><th>Effect</th></tr>
 <tr><td></td><td></td><td></td><td></td></tr>
-<tr><td><code>FAILSAFE</code></td><td><code>True</code></td><td><code>False</code></td><td>When True, mouse in corner raises exception. Disabled to prevent crashes</td></tr>
+<tr><td><code>FAILSAFE</code></td><td><code>True</code></td><td><code>True</code></td><td>Mouse in screen corner raises <code>FailSafeException</code>. Safety re-enabled</td></tr>
 <tr><td><code>PAUSE</code></td><td><code>0.1</code></td><td><code>0</code></td><td>Built-in 100ms delay between calls. Set to 0 for zero latency</td></tr>
 </table>
 
 <h3>Socket.IO Options</h3>
 
-<pre><code>socketio = SocketIO(app, async_mode=&#x27;eventlet&#x27;, cors_allowed_origins=&quot;*&quot;,
+<pre><code>socketio = SocketIO(app, async_mode=&#x27;eventlet&#x27;, cors_allowed_origins=allowed_origin,
+                    max_http_buffer_size=65536,
                     ping_interval=5, ping_timeout=3)</code></pre>
 
 <table>
 <tr><th>Option</th><th>Value</th><th>Description</th></tr>
 <tr><td></td><td></td><td></td></tr>
 <tr><td><code>async_mode</code></td><td><code>'eventlet'</code></td><td>WebSocket-native async. Must match <code>eventlet.monkey_patch()</code> at line 1</td></tr>
-<tr><td><code>cors_allowed_origins</code></td><td><code>"*"</code></td><td>Allow connections from any origin (needed for tunnel access)</td></tr>
+<tr><td><code>cors_allowed_origins</code></td><td><code>allowed_origin</code> (function)</td><td>Dynamic origin validation — accepts localhost, LAN IP, and active tunnel URL</td></tr>
+<tr><td><code>max_http_buffer_size</code></td><td><code>65536</code></td><td>64 KB max HTTP buffer size for Socket.IO messages</td></tr>
 <tr><td><code>ping_interval</code></td><td><code>5</code></td><td>Ping every 5 seconds to keep connection alive</td></tr>
 <tr><td><code>ping_timeout</code></td><td><code>3</code></td><td>Wait 3 seconds for ping response before disconnecting</td></tr>
+</table>
+
+<h3>Security Features (Auto-Configuring)</h3>
+
+<p>All security features are self-contained in <code>server.py</code> with no external configuration required:</p>
+
+<table>
+<tr><th>Feature</th><th>How it works</th></tr>
+<tr><td></td><td></td></tr>
+<tr><td><strong>Pairing code</strong></td><td>Auto-generated via <code>secrets.token_hex(3)</code>. Exposed at <code>GET /api/pairing-code</code></td></tr>
+<tr><td><strong>Rate limiter</strong></td><td>30 calls/sec per action per session. No config needed</td></tr>
+<tr><td><strong>Action allowlist</strong></td><td>Set defined in <code>ALLOWED_ACTIONS</code>; unknown events silently dropped</td></tr>
+<tr><td><strong>Key blocklist</strong></td><td>Set defined in <code>BLOCKED_KEYS</code>; dangerous combos blocked server-side</td></tr>
+<tr><td><strong>CORS validation</strong></td><td><code>allowed_origin()</code> dynamically validates Origin header</td></tr>
+<tr><td><strong>Security headers</strong></td><td><code>@app.after_request</code> adds X-Frame-Options, CSP, etc. on every response</td></tr>
+<tr><td><strong>PII redaction</strong></td><td><code>PIIRedactFilter</code> attached to logger at startup</td></tr>
+<tr><td><strong>Static whitelist</strong></td><td><code>ALLOWED_STATIC_EXTS</code> tuple; unlisted extensions return 404</td></tr>
 </table>
 
 <h3>Cache Control</h3>
@@ -183,13 +208,13 @@ STATIC_DIR = os.path.join(FRONTEND_DIR, &#x27;static&#x27;)
 
 <h3>File Reference</h3>
 
-<pre class="mermaid">graph TD
+    <pre class="mermaid">graph TD
     ROOT[&quot;PROJECT_ROOT&lt;br/&gt;Remote_Mouse/&quot;]
     ROOT --&gt; SRC[&quot;src/&lt;br/&gt;server.py, cli.py, email_service.py&quot;]
     ROOT --&gt; FRONTEND[&quot;frontend/&quot;]
     ROOT --&gt; DOCS[&quot;docs/&quot;]
+    ROOT --&gt; LOG_DIR[&quot;.remote_mouse_logs/&lt;br/&gt;events.log&quot;]
     ROOT --&gt; ENV[&quot;.env&lt;br/&gt;SMTP config&quot;]
-    ROOT --&gt; LOG[&quot;events.log&lt;br/&gt;Runtime log&quot;]
     ROOT --&gt; TUNNEL[&quot;.tunnel_url&lt;br/&gt;Cloudflare URL&quot;]
     ROOT --&gt; EXAMPLE[&quot;.env.example&lt;br/&gt;Template&quot;]
     FRONTEND --&gt; INDEX[&quot;index.html&lt;br/&gt;Main UI&quot;]
@@ -201,7 +226,7 @@ STATIC_DIR = os.path.join(FRONTEND_DIR, &#x27;static&#x27;)
 <tr><td></td><td></td><td></td></tr>
 <tr><td><code>PROJECT_ROOT/.env</code></td><td>Config</td><td>SMTP credentials (gitignored)</td></tr>
 <tr><td><code>PROJECT_ROOT/.env.example</code></td><td>Template</td><td>Copy to <code>.env</code> and fill in</td></tr>
-<tr><td><code>PROJECT_ROOT/events.log</code></td><td>Runtime</td><td>All server events with timestamps (gitignored)</td></tr>
+<tr><td><code>PROJECT_ROOT/.remote_mouse_logs/events.log</code></td><td>Runtime</td><td>All server events with timestamps, PII-redacted (gitignored)</td></tr>
 <tr><td><code>PROJECT_ROOT/.tunnel_url</code></td><td>Runtime</td><td>Current cloudflared URL (gitignored)</td></tr>
 <tr><td><code>PROJECT_ROOT/src/server.py</code></td><td>Source</td><td>Flask + WebSocket + pyautogui</td></tr>
 <tr><td><code>PROJECT_ROOT/src/cli.py</code></td><td>Source</td><td>REPL control panel</td></tr>
@@ -340,7 +365,7 @@ netsh advfirewall firewall add rule name=&quot;Remote Mouse 5000&quot; dir=in ac
 <tr><th>Setting</th><th>Value</th><th>Description</th></tr>
 <tr><td></td><td></td><td></td></tr>
 <tr><td><code>SETUP_URL</code></td><td><code>'http://localhost:5000/setup'</code></td><td>Auto-opened in browser on CLI start</td></tr>
-<tr><td><code>EVENT_LOG_FILE</code></td><td><code>ProjectRoot/events.log</code></td><td>Path to log file for <code>log</code> command</td></tr>
+<tr><td><code>EVENT_LOG_FILE</code></td><td><code>ProjectRoot/.remote_mouse_logs/events.log</code></td><td>Path to log file for <code>log</code> command</td></tr>
 <tr><td><code>TUNNEL_URL_FILE</code></td><td><code>ProjectRoot/.tunnel_url</code></td><td>Path to tunnel URL for <code>status</code> command</td></tr>
 <tr><td>Color coding</td><td>Green=OK, Yellow=WARN, Red=ERROR</td><td>Applied by <code>colorize()</code> based on prefix</td></tr>
 </table>
@@ -377,16 +402,16 @@ cd &quot;$PROJECT_ROOT&quot; || exit 1</code></pre>
 
 <h2>Events Log</h2>
 
-<p>Auto-created at <code>PROJECT_ROOT/events.log</code>. All server events with timestamps:</p>
+<p>Auto-created at <code>PROJECT_ROOT/.remote_mouse_logs/events.log</code>. All server events with timestamps, passed through <code>PIIRedactFilter</code>:</p>
 
-<pre><code>[19:30:22] OK Server starting on port 5000...
+<pre><code>[19:30:22] OK Remote Mouse v1.0.0 starting on port 5000...
 [19:30:22] INFO Local: http://10.0.0.5:5000
-[19:31:05] OK Client connected
+[19:31:05] OK Client connected (authenticated)
 [19:31:12] INFO move   (+0045, -0023)
 [19:31:14] OK click  left
 [19:31:18] INFO scroll (+00120)</code></pre>
 
-<p><strong>Note:</strong> Grows without rotation. Clear periodically or add log rotation for long sessions.</p>
+<p><strong>Note:</strong> Passwords, emails, and URLs are automatically redacted by <code>PIIRedactFilter</code> before being written. Directory created with <code>0o700</code> permissions. Grows without rotation — clear periodically or add log rotation for long sessions.</p>
 
 </main>
 </body>

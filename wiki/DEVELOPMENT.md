@@ -9,10 +9,15 @@
 
 ### Python
 
-- Use `log_ok()`, `log_info()`, `log_warn()` instead of `print()` for server events
+- Use `log_ok()`, `log_info()`, `log_warn()` instead of `print()` for server events (PII auto-redacted)
 - Import `eventlet` monkey patch at line 1 of `server.py`
 - All paths derive from `PROJECT_ROOT` — never use relative paths
-- `pyautogui.FAILSAFE = False` and `PAUSE = 0` at module level
+- `pyautogui.FAILSAFE = True` and `PAUSE = 0` at module level
+- All socket handlers must have `@with_ratelimit('action_name')` decorator
+- New socket handlers must be added to `ALLOWED_ACTIONS` set
+- Never add handlers that bypass `require_auth()` — always decorate with `@require_auth`
+- Never log raw IPs, emails, or URLs directly — use the logging helpers
+- Log output goes to `.remote_mouse_logs/events.log` (auto-created)
 
 ### JavaScript
 
@@ -61,6 +66,9 @@ python -m py_compile src/server.py && python -m py_compile src/cli.py && python 
 | Forgetting `eventlet.monkey_patch()` | WebSocket won't work | Keep it at line 1 of server.py |
 | Using CDN for socket.io | 3-minute load on hotspot | Serve from `/static/socket.io.min.js` |
 | Changing file paths | Breaks PROJECT_ROOT derivation | Update all references in all files |
-| Adding auth | Unnecessary for personal use | Don't — trust the network |
+| Forgetting `@require_auth` on new handlers | Unauthenticated mouse access | Always add the decorator |
+| Forgetting `@with_ratelimit` on new handlers | No rate limiting on the action | Always add the decorator |
+| Logging raw IPs/emails | PII leak in logs | Use the logging helpers |
+| Forgetting to add new actions to `ALLOWED_ACTIONS` | Handler silently ignored | Add to set at module top |
 | Removing `static_folder=None` | Flask 3.0 intercepts /static | Keep it in Flask constructor |
 | Using threads for CLI | Flask-SocketIO threading issues | Use subprocess.Popen |

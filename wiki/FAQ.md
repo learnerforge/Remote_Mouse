@@ -16,7 +16,34 @@ Yes. Safari (iOS) is fully supported. The only limitation is no haptic feedback 
 
 ### Is authentication needed?
 
-No. The project is designed for personal use on trusted networks. Tunnel URLs are random (64-bit entropy) and change on restart.
+Since v1.1.0, yes — a 6-char pairing code is required. The code is printed in the terminal at server startup and must be entered on the phone within 60 seconds. After successful pairing, a session token is stored in `localStorage`.
+
+## Security
+
+### How do I connect?
+
+1. Run `python src/cli.py` or `python src/server.py`
+2. A 6-character hex pairing code (e.g., `A3F1B9`) appears in the terminal output
+3. Open the server URL on your phone
+4. Enter the pairing code on the phone's pairing screen
+5. Once paired, a session token is stored in your browser — you won't need to re-enter for subsequent page loads
+
+### Is this secure?
+
+The v1.1.0 release added several security layers:
+
+- **Pairing auth** — the 6-char code must be physically visible on the laptop screen; it changes on every server restart
+- **Rate limiting** — 30 calls/second per action prevents runaway scripts
+- **FAILSAFE re-enabled** — moving the mouse to a screen corner kills pyautogui operations
+- **Key blocklist** — dangerous combos like Ctrl+Alt+Del and Win+L are blocked server-side
+- **Security headers** — CSP blocks injected scripts, X-Frame-Options prevents clickjacking
+- **PII redaction** — logs are safe to share
+
+For a personal device under your control, this is sufficient. For shared/public networks, consider a VPN.
+
+### Can I use this over Tor?
+
+Not recommended. Tor's high latency (500ms+) makes real-time mouse control unusable. Additionally, Tor Browser may block WebSocket connections depending on security level settings. Use a Cloudflare tunnel instead for remote access.
 
 ## Technical
 

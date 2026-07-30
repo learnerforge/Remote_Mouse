@@ -22,6 +22,8 @@ Remote Mouse is on a journey from **35/100** to **~95/100** vs a wired mouse acr
 | Version | Spec | Feature | Status |
 |---------|------|---------|--------|
 | v1.0.0 | DPI | Preset Selectors (400/800/1600/3200) | ✅ Done |
+| v1.1.0 | Security | Pairing auth, rate limiting, CORS, headers, etc. | ✅ Done |
+
 | v1.0.2 | DPI | Effective DPI Display | ⬜ Planned |
 | v1.0.4 | DPI | Per-Profile DPI | ⬜ Planned |
 | v1.0.6 | DPI | Status Bar DPI Indicator | ⬜ Planned |

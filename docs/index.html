@@ -149,7 +149,7 @@
       SMTP email
       Custom port</pre>
 
-<table>
+    <table>
 <tr><th>Feature</th><th>What it does</th></tr>
 <tr><td></td><td></td></tr>
 <tr><td><strong>Touchpad</strong></td><td>Touch and drag to move cursor. Tap to click. Two-finger scroll.</td></tr>
@@ -166,6 +166,10 @@
 <tr><td><strong>Setup wizard</strong></td><td>3-step <code>/setup</code> page: pick case → email → watch logs → go.</td></tr>
 <tr><td><strong>REPL control panel</strong></td><td>Interactive terminal with <code>status</code>, <code>log</code>, <code>clear</code>, <code>help</code>.</td></tr>
 <tr><td><strong>Local socket.io</strong></td><td>49KB library served from laptop — no CDN, no 3-minute load.</td></tr>
+<tr><td><strong>Pairing authentication</strong></td><td>6-char code shown on laptop terminal; phone must enter code to control.</td></tr>
+<tr><td><strong>Rate limiting</strong></td><td>30 calls/sec per action per session prevents abuse.</td></tr>
+<tr><td><strong>Security headers</strong></td><td>X-Frame-Options, CSP, X-Content-Type-Options, Referrer-Policy, Permissions-Policy.</td></tr>
+<tr><td><strong>PII-redacted logging</strong></td><td>Emails, URLs, and IPs automatically redacted from <code>events.log</code>.</td></tr>
 </table>
 
 <hr>

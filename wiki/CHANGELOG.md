@@ -4,6 +4,31 @@ All notable changes to Remote Mouse are documented here.
 
 ---
 
+## v1.1.0 — Security Release
+
+**Date:** 2026-07-30
+
+### Added
+- Mandatory pairing authentication (6-char code shown on laptop, entered on phone)
+- Dynamic CORS origin validation (replaced wildcard `*`)
+- Rate limiting (30 calls/sec per action per session)
+- Action allowlist (9 approved socket events)
+- OS key combo blocklist (Ctrl+Alt+Del, Win+L, etc.)
+- PII redaction filter for all logs
+- Security headers (X-Frame-Options, CSP, X-Content-Type-Options, Referrer-Policy, Permissions-Policy)
+- Static file extension whitelist (only .js/.css/.png/.ico/.svg/.json/.map)
+- Weekly pip-audit CI workflow
+- Subprocess hardening (shutil.which, stdin=DEVNULL)
+- WebSocket buffer size limit (64 KB)
+- `GET /api/pairing-code` endpoint
+
+### Changed
+- `pyautogui.FAILSAFE` re-enabled (`False` → `True`)
+- Logs moved to `.remote_mouse_logs/events.log` with 0o700 permissions
+- Dependencies pinned to secure minimum versions (eventlet>=0.40.3, flask-socketio>=5.14.0)
+
+---
+
 ## v1.0.0 — DPI Presets
 
 **Date:** 2026-06-26

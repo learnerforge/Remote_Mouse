@@ -36,6 +36,20 @@ python src/cli.py
 python src/server.py
 ```
 
+## Pairing with Your Phone
+
+After starting the server, a 6-character hex pairing code appears in the terminal:
+
+```
+[SECURITY] Pairing code: A3F1B9
+```
+
+1. Open the server URL on your phone (shown in terminal or setup wizard)
+2. The pairing screen appears — enter the code exactly as shown (case-insensitive)
+3. On success, a session token is stored in your phone's browser (localStorage)
+4. Subsequent page loads remember the token — no re-pairing needed
+5. If the code expires (60 seconds), restart the server for a new code
+
 ## Verify Changes
 
 Always run after making code changes:

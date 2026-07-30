@@ -66,7 +66,7 @@ python src/cli.py
 python src/server.py
 ```
 
-Open the setup wizard at `http://localhost:5000/setup` on your laptop to pick your connection type. Then open the provided URL on your phone — the page loads instantly and you can start controlling the mouse.
+Open the setup wizard at `http://localhost:5000/setup` on your laptop to pick your connection type. Then open the provided URL on your phone — enter the 6-character pairing code displayed in the server terminal, and you can start controlling the mouse.
 
 ---
 
@@ -90,6 +90,29 @@ Remote_Mouse/
 
 - **User Documentation:** [`docs/`](docs/index.html) — architecture, configuration, protocol, troubleshooting, comparison (HTML pages with navigation)
 - **Contributor Wiki:** [`wiki/`](wiki/index.md) — setup guide, design decisions, development workflow, FAQ, changelog, roadmap (Markdown pages)
+
+---
+
+## Security
+
+Remote Mouse implements several security measures to protect your system:
+
+- **Pairing Authentication** — On startup, a random 6-character hex code is printed to the server terminal and exposed via `GET /api/pairing-code`. The phone must submit this code before any mouse events are accepted. The token persists in `localStorage` for the session.
+- **Rate Limiting** — Each client session is limited to 30 calls per second per action type via the `RateLimiter` class. All socket event handlers are protected by the `@with_ratelimit` decorator.
+- **Action Allowlist** — Only predefined mouse/keyboard actions (`ALLOWED_ACTIONS`) are accepted. Unknown socket events are silently dropped.
+- **Key Blocklist** — Dangerous key combinations (`Win+L`, `Ctrl+Alt+Del`, etc.) are blocked server-side via `BLOCKED_KEYS`.
+- **CORS Origin Validation** — Dynamic origin checking ensures requests only come from expected sources (localhost, LAN IP, or the active tunnel URL).
+- **Security Headers** — Every response includes `X-Frame-Options: DENY`, Content Security Policy, `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`, and `Permissions-Policy` headers.
+- **PII Redaction** — A custom `PIIRedactFilter` removes emails, URLs, and non-loopback IP addresses from all log output before writing to disk.
+- **Secure Logging** — Logs are stored in `.remote_mouse_logs/events.log` with `0o700` permissions (owner-only access) instead of the project root.
+- **Static File Whitelist** — Only known static file extensions (`.js`, `.css`, `.png`, etc.) are served; unlisted extensions return 404.
+- **FAILSAFE Re-enabled** — `pyautogui.FAILSAFE = True` lets you abort mouse automation by moving the cursor to a screen corner.
+- **Subprocess Hardening** — External commands (`cloudflared`) are resolved via `shutil.which()` before execution, and all subprocesses have `stdin=subprocess.DEVNULL`.
+- **Buffer Limits** — The WebSocket buffer is capped at 65 KB (`max_http_buffer_size=65536`) to prevent memory exhaustion.
+- **Dependency Pins** — `requirements.txt` specifies minimum versions for all packages to avoid regressions.
+- **Security CI** — A GitHub Actions workflow (`.github/workflows/security-audit.yml`) runs weekly `pip-audit` scans for known vulnerabilities.
+
+> **Note:** These measures raise the bar against casual snooping and drive-by attacks but do **not** provide Tor-level anonymity or resistance to nation-state adversaries. The pairing code is sent over the same channel it protects; its purpose is to prevent unauthorized use, not to authenticate users.
 
 ---
 

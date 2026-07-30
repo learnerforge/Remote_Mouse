@@ -53,12 +53,15 @@
 
 <h3>Handshake</h3>
 
-<pre class="mermaid">sequenceDiagram
+    <pre class="mermaid">sequenceDiagram
     participant Client as Phone Browser
     participant Server as Python Server
 
     Client-&gt;&gt;Server: HTTP GET /
     Server--&gt;&gt;Client: index.html (no-cache)
+
+    Client-&gt;&gt;Server: HTTP GET /api/pairing-code
+    Server--&gt;&gt;Client: {code: &quot;A3F9C2&quot;}
 
     Client-&gt;&gt;Server: HTTP GET /static/socket.io.min.js
     Server--&gt;&gt;Client: socket.io.min.js (max-age=86400)
@@ -80,8 +83,28 @@
         end
     end
 
-    Note over Client,Server: Socket.IO automatically establishes connection
-    Server--&gt;&gt;Client: screen_info {width, height, ip, tunnel_url}</pre>
+    Note over Client,Server: Socket.IO connected (unauthenticated)
+
+    alt Has Stored Token
+        Client-&gt;&gt;Server: connect with auth {token}
+        alt Valid Token
+            Server--&gt;&gt;Client: screen_info {width, height, ip, tunnel_url}
+        else Invalid Token
+            Server--&gt;&gt;Client: ConnectionRefusedError('unauthorized')
+            Note over Client,Server: Must re-pair
+        end
+    else No Token
+        Client-&gt;&gt;Server: connect (no auth)
+        Server--&gt;&gt;Client: screen_info
+        Note over Client,Server: UI shows pairing overlay
+        Client-&gt;&gt;Server: pair {code: &quot;A3F9C2&quot;}
+        alt Code Matches
+            Server--&gt;&gt;Client: paired {token: &quot;abc...&quot;}
+            Note over Client: Token saved to localStorage
+        else Wrong Code
+            Server--&gt;&gt;Client: pair_error {message}
+        end
+    end</pre>
 
 <h3>Client Connection Options</h3>
 
@@ -101,7 +124,7 @@
 
 <h4><code>screen_info</code></h4>
 
-<p>Sent automatically when a client connects. Contains laptop screen dimensions and connection URLs.</p>
+    <p>Sent automatically when a client connects. Contains laptop screen dimensions and connection URLs. Note: only sent after successful <code>pair</code> handshake (or during <code>connect</code> with a valid auth token).</p>
 
 <pre><code>{
   &quot;width&quot;: 1920,
@@ -134,6 +157,62 @@
 </table>
 
 <hr>
+
+<h3>Pairing Events</h3>
+
+<h4><code>pair</code> (client → server)</h4>
+
+<p>Sent by the client to submit the pairing code shown on the laptop terminal. Must be sent before any mouse/keyboard events will be processed.</p>
+
+<pre><code>{
+  &quot;code&quot;: &quot;A3F9C2&quot;
+}</code></pre>
+
+<table>
+<tr><th>Field</th><th>Type</th><th>Description</th></tr>
+<tr><td></td><td></td><td></td></tr>
+<tr><td><code>code</code></td><td>string</td><td>6-character hex pairing code from laptop terminal</td></tr>
+</table>
+
+<p><strong>Server handler:</strong></p>
+
+<pre><code>@socketio.on(&#x27;pair&#x27;)
+def handle_pair(data):
+    code = (data or {}).get(&#x27;code&#x27;, &#x27;&#x27;)
+    if code == PAIRING_CODE:
+        token = secrets.token_urlsafe(32)
+        paired_sessions[request.sid] = {&#x27;token&#x27;: token, ...}
+        emit(&#x27;paired&#x27;, {&#x27;token&#x27;: token})
+    else:
+        emit(&#x27;pair_error&#x27;, {&#x27;message&#x27;: &#x27;Invalid pairing code&#x27;})</code></pre>
+
+<h4><code>paired</code> (server → client)</h4>
+
+<p>Sent in response to a successful <code>pair</code>. Contains a session token that the client stores in <code>localStorage</code>.</p>
+
+<pre><code>{
+  &quot;token&quot;: &quot;abc123...&quot;
+}</code></pre>
+
+<table>
+<tr><th>Field</th><th>Type</th><th>Description</th></tr>
+<tr><td></td><td></td><td></td></tr>
+<tr><td><code>token</code></td><td>string</td><td>32-byte URL-safe session token. Re-submitted on reconnect via Socket.IO auth</td></tr>
+</table>
+
+<h4><code>pair_error</code> (server → client)</h4>
+
+<p>Sent in response to a failed <code>pair</code>. The pairing code was incorrect.</p>
+
+<pre><code>{
+  &quot;message&quot;: &quot;Invalid pairing code&quot;
+}</code></pre>
+
+<table>
+<tr><th>Field</th><th>Type</th><th>Description</th></tr>
+<tr><td></td><td></td><td></td></tr>
+<tr><td><code>message</code></td><td>string</td><td>Error description</td></tr>
+</table>
 
 <h3>Client-to-Server Events</h3>
 
@@ -369,13 +448,30 @@ def handle_media(data):
 
 <h2>REST API Endpoints</h2>
 
-<pre class="mermaid">graph TB
+    <pre class="mermaid">graph TB
     subgraph API[&quot;REST API (HTTP)&quot;]
+        CODE[&quot;GET /api/pairing-code&lt;br/&gt;→ {code}&quot;]
         TUNNEL[&quot;GET /api/tunnel-url&lt;br/&gt;→ {url, local_ip}&quot;]
         SEND[&quot;POST /api/send-url&lt;br/&gt;→ {success} | {error}&quot;]
         START[&quot;POST /api/setup-start&lt;br/&gt;→ {success} | {error}&quot;]
         STATUS[&quot;GET /api/setup-status&lt;br/&gt;→ {running, done, logs[]}&quot;]
-    end</pre>
+    end
+
+<h3>GET /api/pairing-code</h3>
+
+<p>Returns the current 6-char pairing code. The client reads this before connecting via WebSocket.</p>
+
+<pre><code>{
+  &quot;code&quot;: &quot;A3F9C2&quot;
+}</code></pre>
+
+<p><strong>Status codes:</strong> <code>200 OK</code></p>
+
+<p><strong>Frontend usage:</strong></p>
+
+<pre><code>fetch('/api/pairing-code')
+  .then(r =&gt; r.json())
+  .then(data =&gt; showPairingCode(data.code));</code></pre>
 
 <h3>GET /api/tunnel-url</h3>
 
@@ -570,6 +666,9 @@ action = data.get(&#x27;action&#x27;, &#x27;&#x27;)</code></pre>
 <ol>
 <li><strong>Client side (<code>index.html</code>):</strong> Call <code>socket.emit('event_name', payload)</code> where needed</li>
 <li><strong>Server side (<code>server.py</code>):</strong> Add <code>@socketio.on('event_name')</code> handler</li>
+<li><strong>Add the action name to <code>ALLOWED_ACTIONS</code>:</strong> The action allowlist will silently drop unknown events</li>
+<li><strong>Add the <code>@with_ratelimit</code> decorator:</strong> Rate limiting is mandatory for all socket handlers</li>
+<li><strong>Add <code>require_auth()</code> guard:</strong> All event handlers must check pairing before processing</li>
 <li><strong>This doc:</strong> Add the event reference</li>
 </ol>
 
