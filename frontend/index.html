@@ -37,6 +37,10 @@ html,body{height:100%;height:100dvh;overflow:hidden;background:var(--bg);color:v
 .page{display:none;flex:1;flex-direction:column}
 .page.active{display:flex}
 
+/* Status bar widgets */
+.status-right{display:flex;align-items:center;gap:8px}
+#mode-indicator{font-size:10px;color:var(--text4)}
+
 /* Touchpad page */
 #touchpad{flex:1;display:flex;align-items:center;justify-content:center;touch-action:none;cursor:default;position:relative;overflow:hidden;background-image:radial-gradient(circle at 25% 40%,var(--glow4) 0%,transparent 50%),radial-gradient(circle at 75% 60%,var(--glow5) 0%,transparent 50%)}
 #touchpad.dim{background:var(--bg2)}
@@ -77,10 +81,11 @@ html,body{height:100%;height:100dvh;overflow:hidden;background:var(--bg);color:v
 #click-bar .drag-btn.on{color:var(--accent);background:var(--drag-on-bg);box-shadow:0 0 8px var(--glow2)}
 
 /* Bottom nav — mode toggle button */
-#theme-btn{background:none;border:none;padding:0;font-size:inherit;cursor:pointer;}
 #mode-nav-btn .icon{transition:transform .3s cubic-bezier(.34,1.56,.64,1)}
 #mode-nav-btn.touch .icon{transform:rotate(0)}
 #mode-nav-btn.mouse .icon{transform:rotate(180deg)}
+#bottom-nav button.active{color:var(--accent)}
+#bottom-nav button.active::after{content:'';position:absolute;bottom:0;left:20%;right:20%;height:2px;background:var(--accent);border-radius:1px}
 
 /* Media page */
 #media-page{align-items:center;justify-content:center;gap:20px;padding:20px}
@@ -146,7 +151,7 @@ html,body{height:100%;height:100dvh;overflow:hidden;background:var(--bg);color:v
 #bottom-nav button{flex:1;padding:12px 0 6px;background:none;border:none;color:var(--text4);font-size:11px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:1px;transition:color .2s;min-height:48px}
 #bottom-nav button .icon{font-size:20px;line-height:1;font-family:'Material Symbols Outlined';font-variation-settings:'FILL' 0,'wght' 700,'GRAD' 0,'opsz' 20;color:#fff}
 :root.light #bottom-nav button .icon{color:#000}
-#bottom-nav button.active{color:var(--accent)}
+/* active moved to bottom nav section */
 
 /* Landscape optimizations */
 @media(max-height:480px){
@@ -176,6 +181,8 @@ html,body{height:100%;height:100dvh;overflow:hidden;background:var(--bg);color:v
 #sens-panel.open{transform:translateY(0)}
 #sens-panel .header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
 #sens-panel .header span{font-size:13px;color:var(--text3)}
+#sens-panel .header+input[type=range]{margin-top:0}
+#sens-panel .header+.header{margin-top:14px}
 #sens-panel .header button{background:none;border:none;color:var(--accent);font-size:14px;cursor:pointer}
 #sens-panel input[type=range]{width:100%;-webkit-appearance:none;appearance:none;height:4px;border-radius:2px;background:var(--text5);outline:none}
 #sens-panel input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:20px;height:20px;border-radius:50%;background:var(--accent);cursor:pointer}
@@ -186,9 +193,9 @@ html,body{height:100%;height:100dvh;overflow:hidden;background:var(--bg);color:v
 <div id="app">
   <div id="status-bar">
     <span><span class="dot" id="status-dot"></span><span id="status-text">Connecting...</span></span>
-    <span style="display:flex;align-items:center;gap:8px">
+    <span class="status-right">
       <span id="status-ip"></span>
-      <span id="mode-indicator" style="font-size:10px;color:var(--text4)">relative</span>
+      <span id="mode-indicator">relative</span>
       <button id="theme-btn" aria-label="Toggle theme">☾</button>
     </span>
   </div>
@@ -264,7 +271,7 @@ html,body{height:100%;height:100dvh;overflow:hidden;background:var(--bg);color:v
       <button id="sens-close">Done</button>
     </div>
     <input type="range" id="sens-slider" min="0.2" max="3.0" step="0.1" value="1.0">
-    <div class="header" style="margin-top:14px">
+    <div class="header">
       <span>Poll Rate: <span id="poll-value">60</span> Hz · <span id="rate-display">0</span> Hz</span>
     </div>
     <input type="range" id="poll-slider" min="10" max="120" step="5" value="60">
@@ -318,7 +325,6 @@ const sendBtn = document.getElementById('send-email-btn');
 const emailMsg = document.getElementById('email-msg');
 const touchCursor = document.getElementById('touch-cursor');
 const tapRipple = document.getElementById('tap-ripple');
-const longRing = document.getElementById('long-ring');
 const scrollInd = document.getElementById('scroll-ind');
 const modeNavBtn = document.getElementById('mode-nav-btn');
 const modeNavLabel = document.getElementById('mode-nav-label');
