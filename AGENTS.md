@@ -55,7 +55,7 @@ Remote_Mouse/
 
 - **No build step.** Frontend is vanilla HTML/CSS/JS. No npm, webpack, vite.
 - **Local socket.io.** Socket.IO client is in `frontend/static/socket.io.min.js`, served locally. Never revert to CDN.
-- **Pairing auth required.** A 6-char hex code is generated at startup. Clients must submit it via `pairing:submit` before any mouse event is processed. Token stored in `localStorage`.
+- **Pairing auth required.** A 6-char hex code is generated at startup and shown in the laptop terminal. Clients must submit it via the `pair` socket event before any mouse event is processed. Token stored in `localStorage`.
 - **eventlet is required.** `src/server.py` uses `eventlet.monkey_patch()` at line 1 and `async_mode='eventlet'`. Do not remove.
 - **`static_folder=None` is required.** Flask app is created with `Flask(__name__, static_folder=None)`. Without this Flask 3.0's built-in handler intercepts `/static/` requests.
 - **Static files cached 24h.** `Cache-Control: public, max-age=86400` on static files. `index.html` and `setup.html` use `no-cache, must-revalidate`.
@@ -75,7 +75,10 @@ Remote_Mouse/
 - **Static file whitelist:** `ALLOWED_STATIC_EXTS` tuple; unlisted extensions return 404.
 - **PII redaction:** `PIIRedactFilter` logging filter redacts emails, URLs, non-loopback IPs from log output.
 - **Buffer size limit:** `max_http_buffer_size=65536` on SocketIO init.
-- **`GET /api/pairing-code`** REST endpoint returns current pairing code.
+- **No pairing-code API.** There is NO REST endpoint that returns the pairing code — it is shown on the laptop screen only. Never add one back.
+- **Pair attempt lockout:** 5 failed `pair` attempts per session → 60s lockout, plus `@with_ratelimit('pair')`.
+- **`screen_info` is authenticated-only.** Tunnel URL / LAN IP / screen dims are emitted only after a valid token connect.
+- **`/api/send-url` requires pairing token** (`X-Pairing-Token` header or JSON body) + rate limit. `/api/setup-start` is IP-rate-limited.
 
 ## Common Mistakes to Avoid
 
@@ -95,17 +98,21 @@ Remote_Mouse/
 ## Security Conventions
 
 ### Pairing Code Flow
-1. `server.py` generates `PAIRING_CODE = secrets.token_hex(3).upper()` at module level.
-2. Printed to stdout/stderr at startup and exposed at `GET /api/pairing-code`.
-3. Client JS reads it from `/api/pairing-code`, stores in `localStorage`, submits via `pairing:submit` socket event.
-4. Server stores `paired_sids[sid] = True` on successful match.
-5. `verify_pairing(sid)` guards every mouse/keyboard handler — returns `True`/`False`, emits `pairing:required` on failure.
-6. Frontend `pairing.js` (inline in `index.html`) handles the entire flow.
+1. `server.py` generates `PAIRING_CODE = secrets.token_hex(3)` at module level.
+2. Printed to stdout/stderr at startup and shown in the CLI/terminal. NOT exposed via any REST endpoint.
+3. The phone user types the 6-char code into the pairing overlay → `pair` socket event.
+4. Server returns a 32-byte `token` via `paired` event and stores `paired_sessions[sid] = {'token': ...}`.
+5. Client stores the token in `localStorage`, reconnects with `auth: { token }`.
+6. `handle_connect(auth)` validates the token against `paired_sessions` (rejects unknown tokens with `unauthorized`).
+7. `require_auth()` guards every mouse/keyboard handler — returns `True`/`False`; unauthenticated handlers no-op.
+8. Failed `pair` attempts are tracked per session; 5 failures in 60s triggers a lockout.
+9. Frontend pairing overlay (inline in `index.html`) handles the entire flow.
 
 ### Rate Limiter (`RateLimiter` class)
 - Per-action, per-session bucket with `max_calls=30, window=1.0`.
 - `@with_ratelimit` decorator wraps socket handlers, passes sid as first arg.
 - Exceeded calls silently dropped (no emit back to client).
+- REST endpoints are IP-rate-limited: `rest_limiter` (5/min for `/api/send-url`) and `setup_limiter` (2/min for `/api/setup-start`).
 
 ### CORS (`allowed_origin` function)
 - Accepts `http://localhost:<any port>`, `http://127.0.0.1:<any port>`.
@@ -127,7 +134,7 @@ Remote_Mouse/
 Applied in `@app.after_request`:
 ```
 X-Frame-Options: DENY
-Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' ws://* wss://*; img-src 'self' data:
+Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src 'self' ws://* wss://*; img-src 'self' data:; frame-ancestors 'none'
 X-Content-Type-Options: nosniff
 Referrer-Policy: no-referrer
 Permissions-Policy: geolocation=(), microphone=(), camera=()

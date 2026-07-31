@@ -60,9 +60,6 @@
     Client-&gt;&gt;Server: HTTP GET /
     Server--&gt;&gt;Client: index.html (no-cache)
 
-    Client-&gt;&gt;Server: HTTP GET /api/pairing-code
-    Server--&gt;&gt;Client: {code: &quot;A3F9C2&quot;}
-
     Client-&gt;&gt;Server: HTTP GET /static/socket.io.min.js
     Server--&gt;&gt;Client: socket.io.min.js (max-age=86400)
 
@@ -95,8 +92,7 @@
         end
     else No Token
         Client-&gt;&gt;Server: connect (no auth)
-        Server--&gt;&gt;Client: screen_info
-        Note over Client,Server: UI shows pairing overlay
+        Note over Client,Server: No screen_info — UI shows pairing overlay
         Client-&gt;&gt;Server: pair {code: &quot;A3F9C2&quot;}
         alt Code Matches
             Server--&gt;&gt;Client: paired {token: &quot;abc...&quot;}
@@ -450,28 +446,11 @@ def handle_media(data):
 
     <pre class="mermaid">graph TB
     subgraph API[&quot;REST API (HTTP)&quot;]
-        CODE[&quot;GET /api/pairing-code&lt;br/&gt;→ {code}&quot;]
         TUNNEL[&quot;GET /api/tunnel-url&lt;br/&gt;→ {url, local_ip}&quot;]
         SEND[&quot;POST /api/send-url&lt;br/&gt;→ {success} | {error}&quot;]
         START[&quot;POST /api/setup-start&lt;br/&gt;→ {success} | {error}&quot;]
         STATUS[&quot;GET /api/setup-status&lt;br/&gt;→ {running, done, logs[]}&quot;]
     end
-
-<h3>GET /api/pairing-code</h3>
-
-<p>Returns the current 6-char pairing code. The client reads this before connecting via WebSocket.</p>
-
-<pre><code>{
-  &quot;code&quot;: &quot;A3F9C2&quot;
-}</code></pre>
-
-<p><strong>Status codes:</strong> <code>200 OK</code></p>
-
-<p><strong>Frontend usage:</strong></p>
-
-<pre><code>fetch('/api/pairing-code')
-  .then(r =&gt; r.json())
-  .then(data =&gt; showPairingCode(data.code));</code></pre>
 
 <h3>GET /api/tunnel-url</h3>
 
@@ -496,13 +475,14 @@ def handle_media(data):
 
 <h3>POST /api/send-url</h3>
 
-<p>Sends tunnel URL to a specified email via SMTP.</p>
+<p>Sends tunnel URL to a specified email via SMTP. Requires pairing auth (a valid token) to prevent SMTP relay abuse, and is IP-rate-limited (5/min).</p>
 
 <p><strong>Request:</strong></p>
 
 <pre><code>{
   &quot;email&quot;: &quot;user@example.com&quot;
-}</code></pre>
+}
+Header: X-Pairing-Token: &lt;token&gt;   (or &quot;token&quot; field in JSON body)</code></pre>
 
 <p><strong>Success <code>200</code>:</strong></p>
 
@@ -516,6 +496,14 @@ def handle_media(data):
 <pre><code>{ &quot;error&quot;: &quot;Invalid email address&quot; }
 { &quot;error&quot;: &quot;No tunnel URL available&quot; }</code></pre>
 
+<p><strong>Error <code>403</code>:</strong></p>
+
+<pre><code>{ &quot;error&quot;: &quot;Not paired. Re-open index.html on your phone.&quot; }</code></pre>
+
+<p><strong>Error <code>429</code>:</strong></p>
+
+<pre><code>{ &quot;error&quot;: &quot;Too many requests. Wait a minute.&quot; }</code></pre>
+
 <p><strong>Error <code>500</code>:</strong></p>
 
 <pre><code>{ &quot;error&quot;: &quot;Failed to send email: connection refused&quot; }</code></pre>
@@ -524,7 +512,7 @@ def handle_media(data):
 
 <h3>POST /api/setup-start</h3>
 
-<p>Starts the setup wizard workflow in a background thread.</p>
+<p>Starts the setup wizard workflow in a background thread. IP-rate-limited (2/min).</p>
 
 <p><strong>Request:</strong></p>
 

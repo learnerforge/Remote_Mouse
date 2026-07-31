@@ -10,15 +10,19 @@ from email_service import load_env, build_url_email
 
 class TestLoadEnv(unittest.TestCase):
     def setUp(self):
-        self.tmp = tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.env')
-        self.env_path = self.tmp.name
+        self.tmpdir = tempfile.mkdtemp()
+        self.env_path = os.path.join(self.tmpdir, '.env')
 
     def tearDown(self):
-        os.unlink(self.env_path)
+        try:
+            os.unlink(self.env_path)
+        except FileNotFoundError:
+            pass
+        os.rmdir(self.tmpdir)
 
     def _write(self, content):
-        self.tmp.write(content)
-        self.tmp.close()
+        with open(self.env_path, 'w') as f:
+            f.write(content)
 
     def test_simple_key_value(self):
         self._write('SMTP_HOST=smtp.gmail.com\n')

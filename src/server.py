@@ -54,8 +54,8 @@ TUNNEL_URL_FILE = os.path.join(PROJECT_ROOT, '.tunnel_url')
 
 cloudflared_proc = None
 PAIRING_CODE = secrets.token_hex(3)
-PAIRING_EXPIRY = 300
 paired_sessions = {}
+pair_failures = defaultdict(list)
 
 # PII redaction filter
 class PIIRedactFilter(logging.Filter):
@@ -99,7 +99,7 @@ def log_warn(msg): logger.warning(msg)
 # Action allowlist — only these socket events are permitted
 ALLOWED_ACTIONS = {
     'mouse_move', 'mouse_abs', 'click', 'scroll', 'media',
-    'mouse_down', 'mouse_up', 'request_tunnel_url', 'disconnect'
+    'mouse_down', 'mouse_up', 'request_tunnel_url', 'pair', 'disconnect'
 }
 
 # Blocked key combinations (OS-level dangerous combos)
@@ -129,6 +129,15 @@ class RateLimiter:
         self._buckets.pop(sid, None)
 
 rate_limiter = RateLimiter(max_calls=30, window=1.0)
+
+# REST rate limits (keyed by remote IP)
+rest_limiter = RateLimiter(max_calls=5, window=60)
+setup_limiter = RateLimiter(max_calls=2, window=60)
+
+def pairing_token_valid(token):
+    if not token:
+        return False
+    return any(s.get('token') == token for s in paired_sessions.values())
 
 def validate_action(action):
     if action not in ALLOWED_ACTIONS:
@@ -315,7 +324,7 @@ def add_security_headers(resp):
     resp.headers['X-Frame-Options'] = 'DENY'
     resp.headers['X-Content-Type-Options'] = 'nosniff'
     resp.headers['X-XSS-Protection'] = '0'
-    resp.headers['Content-Security-Policy'] = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; frame-ancestors 'none'"
+    resp.headers['Content-Security-Policy'] = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src 'self' ws://* wss://*; img-src 'self' data:; frame-ancestors 'none'"
     resp.headers['Referrer-Policy'] = 'no-referrer'
     resp.headers['Permissions-Policy'] = 'geolocation=(), microphone=(), camera=()'
     return resp
@@ -355,6 +364,8 @@ def setup_page():
 
 @app.route('/api/setup-start', methods=['POST'])
 def api_setup_start():
+    if not setup_limiter.check(request.remote_addr, 'setup-start'):
+        return jsonify({'error': 'Too many requests. Wait a minute.'}), 429
     data = request.get_json() or {}
     case = data.get('case')
     email = (data.get('email') or '').strip()
@@ -421,7 +432,12 @@ def api_setup_status():
 
 @app.route('/api/send-url', methods=['POST'])
 def api_send_url():
-    data = request.get_json()
+    if not rest_limiter.check(request.remote_addr, 'send-url'):
+        return jsonify({'error': 'Too many requests. Wait a minute.'}), 429
+    data = request.get_json() or {}
+    token = data.get('token') or request.headers.get('X-Pairing-Token', '')
+    if not pairing_token_valid(token):
+        return jsonify({'error': 'Not paired. Re-open index.html on your phone.'}), 403
     email = (data.get('email') or '').strip()
     if not email or not EMAIL_RE.match(email):
         return jsonify({'error': 'Invalid email address'}), 400
@@ -435,10 +451,6 @@ def api_send_url():
         return jsonify({'success': True, 'message': f'Tunnel URL sent to {email}'})
     except Exception as e:
         return jsonify({'error': f'Failed to send email: {str(e)}'}), 500
-
-@app.route('/api/pairing-code')
-def api_pairing_code():
-    return jsonify({'code': PAIRING_CODE})
 
 def with_ratelimit(action):
     def decorator(f):
@@ -478,31 +490,41 @@ def handle_connect(auth):
     if token:
         paired_sessions[request.sid]['token'] = token
         log_ok("Client connected (authenticated)")
+        w, h = pyautogui.size()
+        emit('screen_info', {
+            'width': w, 'height': h,
+            'ip': get_local_ip(),
+            'tunnel_url': get_tunnel_url() or ''
+        })
     else:
         log_info("Client connected (unauthenticated)")
 
-    w, h = pyautogui.size()
-    emit('screen_info', {
-        'width': w, 'height': h,
-        'ip': get_local_ip(),
-        'tunnel_url': get_tunnel_url() or ''
-    })
-
 @socketio.on('pair')
+@with_ratelimit('pair')
 def handle_pair(data):
-    code = (data or {}).get('code', '')
+    sid = request.sid
+    now = time.time()
+    pair_failures[sid] = [t for t in pair_failures[sid] if now - t < 60]
+    if len(pair_failures[sid]) >= 5:
+        log_warn("Pairing lockout: too many failures")
+        emit('pair_error', {'message': 'Too many attempts. Wait 60 seconds.'})
+        return
+    code = (data or {}).get('code', '').strip().lower()
     if code == PAIRING_CODE:
         token = secrets.token_urlsafe(32)
-        paired_sessions[request.sid] = {'token': token, 'paired_at': time.time(), 'connected': True}
+        paired_sessions[sid] = {'token': token, 'paired_at': now, 'connected': True}
+        pair_failures.pop(sid, None)
         emit('paired', {'token': token})
         log_ok("Client paired successfully")
     else:
+        pair_failures[sid].append(now)
         emit('pair_error', {'message': 'Invalid pairing code'})
         log_warn("Failed pairing attempt")
 
 @socketio.on('disconnect')
 def handle_disconnect():
     rate_limiter.cleanup(request.sid)
+    pair_failures.pop(request.sid, None)
     paired_sessions.pop(request.sid, None)
     log_info("Client disconnected")
 

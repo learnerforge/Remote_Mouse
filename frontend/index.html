@@ -492,7 +492,10 @@ sendBtn.addEventListener('click', () => {
 
   fetch('/api/send-url', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Pairing-Token': pairingToken || ''
+    },
     body: JSON.stringify({ email })
   }).then(r => r.json()).then(data => {
     if (data.success) {

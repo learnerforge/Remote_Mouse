@@ -495,8 +495,8 @@
 
 <h3>1. Pairing Authentication</h3>
 <ul>
-<li>A 6-char hex code (<code>PAIRING_CODE</code>) is generated at server start via <code>secrets.token_hex(3).upper()</code></li>
-<li>Printed to terminal and exposed at <code>GET /api/pairing-code</code></li>
+<li>A 6-char hex code (<code>PAIRING_CODE</code>) is generated at server start via <code>secrets.token_hex(3)</code></li>
+<li>Printed to the terminal/CLI only. NOT exposed via any REST endpoint</li>
 <li>Client submits the code via the <code>pair</code> socket event; server returns <code>paired</code> with a session token or <code>pair_error</code></li>
 <li>All mouse/keyboard socket handlers call <code>require_auth()</code> and reject unpaired sessions</li>
 <li>Token is stored in <code>localStorage</code> as <code>rm_token</code> and sent on reconnect for persistent auth</li>

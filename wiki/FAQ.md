@@ -4,7 +4,7 @@
 
 ### What makes this different from other remote mouse apps?
 
-No phone installation. Zero. The phone just opens a URL in the browser. No app store, no APK download, no permissions to grant. The server is three Python files with no database and no authentication — minimal attack surface.
+No phone installation. Zero. The phone just opens a URL in the browser. No app store, no APK download, no permissions to grant. The server is three Python files with no database — minimal attack surface.
 
 ### Does it work over the internet?
 
@@ -16,7 +16,7 @@ Yes. Safari (iOS) is fully supported. The only limitation is no haptic feedback 
 
 ### Is authentication needed?
 
-Since v1.1.0, yes — a 6-char pairing code is required. The code is printed in the terminal at server startup and must be entered on the phone within 60 seconds. After successful pairing, a session token is stored in `localStorage`.
+Since v1.1.0, yes — a 6-char pairing code is required. The code is printed in the laptop terminal at server startup and must be entered manually on the phone (it is not exposed via any REST endpoint, so it cannot be fetched over the network). The code stays valid while the server runs. After successful pairing, a session token is stored in `localStorage`. 5 failed attempts trigger a 60-second lockout.
 
 ## Security
 
@@ -33,11 +33,13 @@ Since v1.1.0, yes — a 6-char pairing code is required. The code is printed in 
 The v1.1.0 release added several security layers:
 
 - **Pairing auth** — the 6-char code must be physically visible on the laptop screen; it changes on every server restart
-- **Rate limiting** — 30 calls/second per action prevents runaway scripts
+- **Pair lockout** — 5 failed `pair` attempts trigger a 60-second lockout (v1.1.1)
+- **Rate limiting** — 30 calls/second per action prevents runaway scripts; REST endpoints are IP-rate-limited
 - **FAILSAFE re-enabled** — moving the mouse to a screen corner kills pyautogui operations
 - **Key blocklist** — dangerous combos like Ctrl+Alt+Del and Win+L are blocked server-side
 - **Security headers** — CSP blocks injected scripts, X-Frame-Options prevents clickjacking
 - **PII redaction** — logs are safe to share
+- **Email endpoint auth** — `POST /api/send-url` requires the pairing token (v1.1.1)
 
 For a personal device under your control, this is sufficient. For shared/public networks, consider a VPN.
 

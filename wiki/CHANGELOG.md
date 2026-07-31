@@ -4,6 +4,25 @@ All notable changes to Remote Mouse are documented here.
 
 ---
 
+## v1.1.1 — Security Hardening
+
+**Date:** 2026-07-31
+
+### Fixed
+- Removed unauthenticated `GET /api/pairing-code` endpoint — the pairing code now lives only on the laptop screen (this endpoint let anyone on the LAN fetch the code and defeat pairing)
+- Restored CSP directives (`script-src 'unsafe-inline'`, `connect-src ws://* wss://*`, `img-src 'self' data:`) that were breaking inline scripts and WebSocket connections
+- `screen_info` (tunnel URL, LAN IP, screen dims) now emitted only to authenticated clients
+- Email endpoint hardening: `POST /api/send-url` now requires the pairing token and is IP-rate-limited (was an open SMTP relay)
+- Pairing brute-force protection: `pair` event is rate-limited and 5 failed attempts trigger a 60s lockout
+- Removed dead `PAIRING_EXPIRY` constant
+- Fixed `tests/test_email_service.py` setup (temp file was named `.env` inside a temp dir, not at `tempdir/.env`)
+
+### Changed
+- `pairing:submit` event renamed to `pair` (matching implementation); docs updated
+- Corrected CHANGELOG pin note below (`flask-socketio>=5.6.0` — `>=5.14.0` does not exist on PyPI)
+
+---
+
 ## v1.1.0 — Security Release
 
 **Date:** 2026-07-30
@@ -12,7 +31,7 @@ All notable changes to Remote Mouse are documented here.
 - Mandatory pairing authentication (6-char code shown on laptop, entered on phone)
 - Dynamic CORS origin validation (replaced wildcard `*`)
 - Rate limiting (30 calls/sec per action per session)
-- Action allowlist (9 approved socket events)
+- Action allowlist (10 approved socket events)
 - OS key combo blocklist (Ctrl+Alt+Del, Win+L, etc.)
 - PII redaction filter for all logs
 - Security headers (X-Frame-Options, CSP, X-Content-Type-Options, Referrer-Policy, Permissions-Policy)
@@ -20,12 +39,12 @@ All notable changes to Remote Mouse are documented here.
 - Weekly pip-audit CI workflow
 - Subprocess hardening (shutil.which, stdin=DEVNULL)
 - WebSocket buffer size limit (64 KB)
-- `GET /api/pairing-code` endpoint
+- `GET /api/pairing-code` endpoint (removed in v1.1.1 — security hole)
 
 ### Changed
 - `pyautogui.FAILSAFE` re-enabled (`False` → `True`)
 - Logs moved to `.remote_mouse_logs/events.log` with 0o700 permissions
-- Dependencies pinned to secure minimum versions (eventlet>=0.40.3, flask-socketio>=5.14.0)
+- Dependencies pinned to secure minimum versions (eventlet>=0.40.3, flask-socketio>=5.6.0)
 
 ---
 

@@ -35,15 +35,15 @@ server_proc = subprocess.Popen([sys.executable, '-u', server_script], ...)
 
 ## Why pairing auth?
 
-v1.1.0 introduced a pairing code system (6-char hex code, e.g. `A3F1B9`). At startup, the server generates a `PAIRING_CODE` displayed in the terminal. The client must send a `pair` event with this code within 60 seconds; the server responds with a session token stored in `localStorage`.
+v1.1.0 introduced a pairing code system (6-char hex code, e.g. `a3f1b9`). At startup, the server generates a `PAIRING_CODE` displayed in the terminal. The client sends a `pair` event with this code; the server responds with a session token stored in `localStorage`. The code is valid for the server's lifetime (fresh code on restart). Since v1.1.1 the code is shown on the laptop screen only — there is no REST endpoint that returns it — and 5 failed `pair` attempts trigger a 60s lockout.
 
 ```python
-PAIRING_CODE = secrets.token_hex(3).upper()  # 6 hex chars
+PAIRING_CODE = secrets.token_hex(3)  # 6 hex chars
 ```
 
-**Why not password-based?** A pairing code is single-use, volatile (invalidates on restart), and requires physical proximity to the laptop. This is stronger than a static password for the "personal device" threat model.
+**Why not password-based?** A pairing code is volatile (invalidates on restart) and requires physical proximity to the laptop. This is stronger than a static password for the "personal device" threat model.
 
-**Flow:** Server starts → code printed → phone connects via WebSocket → sends `pair` event → validates → returns session token → all subsequent events require token via `@require_auth`.
+**Flow:** Server starts → code printed → phone connects via WebSocket → sends `pair` event → validates → returns session token → all subsequent events require token via `require_auth()`.
 
 ## Why local socket.io?
 

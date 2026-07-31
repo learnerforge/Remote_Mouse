@@ -97,7 +97,8 @@ Remote_Mouse/
 
 Remote Mouse implements several security measures to protect your system:
 
-- **Pairing Authentication** — On startup, a random 6-character hex code is printed to the server terminal and exposed via `GET /api/pairing-code`. The phone must submit this code before any mouse events are accepted. The token persists in `localStorage` for the session.
+- **Pairing Authentication** — On startup, a random 6-character hex code is printed to the server terminal/CLI (never exposed via any REST endpoint). The phone user types it into the pairing overlay, and the server returns a 32-byte token stored in `localStorage`. No mouse events are processed without a valid token.
+- **Pair Attempt Lockout** — 5 failed `pair` attempts per session trigger a 60-second lockout, and the `pair` event is rate-limited.
 - **Rate Limiting** — Each client session is limited to 30 calls per second per action type via the `RateLimiter` class. All socket event handlers are protected by the `@with_ratelimit` decorator.
 - **Action Allowlist** — Only predefined mouse/keyboard actions (`ALLOWED_ACTIONS`) are accepted. Unknown socket events are silently dropped.
 - **Key Blocklist** — Dangerous key combinations (`Win+L`, `Ctrl+Alt+Del`, etc.) are blocked server-side via `BLOCKED_KEYS`.
@@ -109,6 +110,7 @@ Remote Mouse implements several security measures to protect your system:
 - **FAILSAFE Re-enabled** — `pyautogui.FAILSAFE = True` lets you abort mouse automation by moving the cursor to a screen corner.
 - **Subprocess Hardening** — External commands (`cloudflared`) are resolved via `shutil.which()` before execution, and all subprocesses have `stdin=subprocess.DEVNULL`.
 - **Buffer Limits** — The WebSocket buffer is capped at 65 KB (`max_http_buffer_size=65536`) to prevent memory exhaustion.
+- **Email Endpoint Auth** — `POST /api/send-url` requires the pairing token (`X-Pairing-Token` header or JSON body) and is IP-rate-limited, preventing SMTP relay abuse.
 - **Dependency Pins** — `requirements.txt` specifies minimum versions for all packages to avoid regressions.
 - **Security CI** — A GitHub Actions workflow (`.github/workflows/security-audit.yml`) runs weekly `pip-audit` scans for known vulnerabilities.
 

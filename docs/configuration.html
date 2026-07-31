@@ -126,9 +126,9 @@ SMTP_PASSWORD=your-app-password</code></pre>
 
 <h3>Pairing Code</h3>
 
-<pre><code>PAIRING_CODE = secrets.token_hex(3).upper()  # e.g. &quot;A3F9C2&quot;</code></pre>
+<pre><code>PAIRING_CODE = secrets.token_hex(3)  # e.g. &quot;a3f9c2&quot;</code></pre>
 
-<p>Auto-generated on each server start. A 6-char hex code printed to the terminal and exposed at <code>GET /api/pairing-code</code>. No manual configuration needed — authentication is self-contained.</p>
+<p>Auto-generated on each server start. A 6-char hex code shown in the terminal/CLI only — there is no REST endpoint that returns it. No manual configuration needed — authentication is self-contained.</p>
 
 <h3>pyautogui Tuning</h3>
 
@@ -165,7 +165,7 @@ pyautogui.PAUSE = 0</code></pre>
 <table>
 <tr><th>Feature</th><th>How it works</th></tr>
 <tr><td></td><td></td></tr>
-<tr><td><strong>Pairing code</strong></td><td>Auto-generated via <code>secrets.token_hex(3)</code>. Exposed at <code>GET /api/pairing-code</code></td></tr>
+<tr><td><strong>Pairing code</strong></td><td>Auto-generated via <code>secrets.token_hex(3)</code>. Shown in the terminal only — no REST endpoint. 5 failed <code>pair</code> attempts → 60s lockout</td></tr>
 <tr><td><strong>Rate limiter</strong></td><td>30 calls/sec per action per session. No config needed</td></tr>
 <tr><td><strong>Action allowlist</strong></td><td>Set defined in <code>ALLOWED_ACTIONS</code>; unknown events silently dropped</td></tr>
 <tr><td><strong>Key blocklist</strong></td><td>Set defined in <code>BLOCKED_KEYS</code>; dangerous combos blocked server-side</td></tr>
