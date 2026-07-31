@@ -28,10 +28,6 @@ TEMPLATE = '''<!DOCTYPE html>
 <nav>
 <h2>Remote Mouse</h2>
 <ul>{nav}</ul>
-<div class="section-title">Reference</div>
-<ul>
-{nav_ref}
-</ul>
 </nav>
 <main>
 {content}
@@ -213,7 +209,6 @@ def convert_file(md_path, title):
         title=html_mod.escape(title),
         css=CSS,
         nav=nav_html,
-        nav_ref=nav_html,
         content=content
     )
     with open(html_path, 'w', encoding='utf-8') as f:
