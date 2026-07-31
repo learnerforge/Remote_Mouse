@@ -1,6 +1,6 @@
 # Remote Mouse
 
-Turn your phone into a wireless mouse and media remote for your laptop. Zero phone installation: the laptop runs a Python server (Flask + SocketIO + pyautogui), the phone just opens a URL. Features touchpad with DPI presets (400/800/1600/3200), two-finger scroll, media controls, Cloudflare tunnel for remote access, and SMTP email delivery of a URL.
+Turn your phone into a wireless mouse and media remote for your laptop. Zero phone installation — the laptop runs a Python server (Flask + SocketIO + pyautogui), the phone just opens a URL. Touchpad with DPI presets, two-finger scroll, media controls, and optional Cloudflare tunnel for remote access.
 
 <div align="center">
   <img src="https://img.shields.io/badge/python-3.12-blue?logo=python" alt="Python 3.12"/>
@@ -16,122 +16,51 @@ Turn your phone into a wireless mouse and media remote for your laptop. Zero pho
 
 ## Features
 
-- **Touchpad** — touch and drag to move cursor, tap to click, two-finger scroll
-- **Click Bar** — dedicated left, right, and DPI preset (400/800/1600/3200) buttons
+- **Touchpad** — drag to move the cursor, tap to click, two-finger scroll
+- **Click Bar** — left, right, and DPI preset (400/800/1600/3200) buttons
 - **Media Remote** — play/pause, next/previous track, volume up/down, mute
-- **Sensitivity Control** — adjustable cursor speed slider (0.2x to 3.0x)
-- **Drag Mode** — hold left button while dragging for selections and window movement
+- **Sensitivity Control** — adjustable cursor speed (0.2x to 3.0x)
 - **Setup Wizard** — 3-step connection guide at `/setup` with live log output
 - **Tunnel URL Delivery** — auto-emails the Cloudflare tunnel URL to your phone
-- **Auto-Reconnect** — WebSocket reconnects with exponential backoff (1s to 5s)
-- **REPL Control Panel** — interactive terminal with status, log, and server management
-- **Local Fallback** — works over same WiFi if cloudflared is not installed
+- **REPL Control Panel** — interactive terminal with status, live logs, and server management
 
 ---
 
-## Tech Stack
-
-- Language: Python 3.10+, JavaScript (vanilla)
-- Framework: Flask, Flask-SocketIO
-- Database: None (file-based event logging)
-- Other Tools: cloudflared, pyautogui, eventlet, colorama, smtplib
-
----
-
-## Installation
+## Quick Start
 
 ```bash
-# Clone the repository
 git clone https://github.com/learnerforge/Remote_Mouse.git
-
-# Go to project folder
 cd Remote_Mouse
-
-# Install dependencies
 pip install -r requirements.txt
 
-# (Optional) Configure SMTP email
-cp .env.example .env
-```
-
----
-
-## Usage
-
-```bash
 # Start with REPL control panel (recommended)
 python src/cli.py
-
-# Or start the server directly
-python src/server.py
 ```
 
-Open the setup wizard at `http://localhost:5000/setup` on your laptop to pick your connection type. Then open the provided URL on your phone — enter the 6-character pairing code displayed in the server terminal, and you can start controlling the mouse.
-
----
-
-## Project Structure
-
-```
-Remote_Mouse/
-│── src/                 # Python source (server, cli, email_service)
-│── frontend/            # Web frontend (index.html, setup.html, static/)
-│── docs/                # User documentation (HTML pages)
-│── wiki/                # Contributor documentation (Markdown)
-│── scripts/             # Legacy launcher scripts
-│── README.md
-│── requirements.txt
-│── .env.example
-```
+Open `http://localhost:5000/setup` on your laptop, pick a connection type, then open the shown URL on your phone and enter the 6-character pairing code displayed in the server terminal. Full setup, prerequisites, and SMTP/cloudflared configuration: [wiki/SETUP.md](wiki/SETUP.md).
 
 ---
 
 ## Documentation
 
-- **User Documentation:** [`docs/`](docs/index.html) — architecture, configuration, protocol, troubleshooting, comparison (HTML pages with navigation)
-- **Contributor Wiki:** [`wiki/`](wiki/index.md) — setup guide, design decisions, development workflow, FAQ, changelog, roadmap (Markdown pages)
+| Resource | What's inside |
+|----------|---------------|
+| [`docs/`](docs/index.html) | User docs — architecture, configuration, protocol, troubleshooting (HTML) |
+| [`wiki/`](wiki/index.md) | Contributor docs — setup, design decisions, development workflow, FAQ, changelog, roadmap (Markdown) |
+
+Security details live in [docs/architecture.html](docs/architecture.html) (user) and [wiki/ARCHITECTURE.md](wiki/ARCHITECTURE.md) (contributor). At a glance: pairing authentication, rate limiting, CORS origin validation, key-combo blocklist, PII-redacted logging, and security headers.
 
 ---
 
-## Security
+## Roadmap
 
-Remote Mouse implements several security measures to protect your system:
-
-- **Pairing Authentication** — On startup, a random 6-character hex code is printed to the server terminal/CLI (never exposed via any REST endpoint). The phone user types it into the pairing overlay, and the server returns a 32-byte token stored in `localStorage`. No mouse events are processed without a valid token.
-- **Pair Attempt Lockout** — 5 failed `pair` attempts per session trigger a 60-second lockout, and the `pair` event is rate-limited.
-- **Rate Limiting** — Each client session is limited to 30 calls per second per action type via the `RateLimiter` class. All socket event handlers are protected by the `@with_ratelimit` decorator.
-- **Action Allowlist** — Only predefined mouse/keyboard actions (`ALLOWED_ACTIONS`) are accepted. Unknown socket events are silently dropped.
-- **Key Blocklist** — Dangerous key combinations (`Win+L`, `Ctrl+Alt+Del`, etc.) are blocked server-side via `BLOCKED_KEYS`.
-- **CORS Origin Validation** — Dynamic origin checking ensures requests only come from expected sources (localhost, LAN IP, or the active tunnel URL).
-- **Security Headers** — Every response includes `X-Frame-Options: DENY`, Content Security Policy, `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`, and `Permissions-Policy` headers.
-- **PII Redaction** — A custom `PIIRedactFilter` removes emails, URLs, and non-loopback IP addresses from all log output before writing to disk.
-- **Secure Logging** — Logs are stored in `.remote_mouse_logs/events.log` with `0o700` permissions (owner-only access) instead of the project root.
-- **Static File Whitelist** — Only known static file extensions (`.js`, `.css`, `.png`, etc.) are served; unlisted extensions return 404.
-- **FAILSAFE Re-enabled** — `pyautogui.FAILSAFE = True` lets you abort mouse automation by moving the cursor to a screen corner.
-- **Subprocess Hardening** — External commands (`cloudflared`) are resolved via `shutil.which()` before execution, and all subprocesses have `stdin=subprocess.DEVNULL`.
-- **Buffer Limits** — The WebSocket buffer is capped at 65 KB (`max_http_buffer_size=65536`) to prevent memory exhaustion.
-- **Email Endpoint Auth** — `POST /api/send-url` requires the pairing token (`X-Pairing-Token` header or JSON body) and is IP-rate-limited, preventing SMTP relay abuse.
-- **Dependency Pins** — `requirements.txt` specifies minimum versions for all packages to avoid regressions.
-- **Security CI** — A GitHub Actions workflow (`.github/workflows/security-audit.yml`) runs weekly `pip-audit` scans for known vulnerabilities.
-
-> **Note:** These measures raise the bar against casual snooping and drive-by attacks but do **not** provide Tor-level anonymity or resistance to nation-state adversaries. The pairing code is sent over the same channel it protects; its purpose is to prevent unauthorized use, not to authenticate users.
-
----
-
-## Future Improvements
-
-- Add middle click and back/forward navigation buttons
-- Implement acceleration curves, flick scroll, and momentum
-- Add polling rate control and real-time rate monitoring
-- Support Bluetooth and LAN discovery for zero-config connection
-- Add remappable buttons, macro editor, and onboard profile storage
-- Develop ergonomic UI themes, palm rejection, and grip calibration
+See [wiki/PLAN.md](wiki/PLAN.md) and [version_control.md](version_control.md) for the versioned feature roadmap and change history.
 
 ---
 
 ## Contributing
 
-Contributions are welcome. Read the [wiki](wiki/index.md) to get started. Feel free to open an issue or submit a pull request.
+Contributions are welcome. Read the [wiki](wiki/index.md) to get started, then open an issue or submit a pull request.
 
 ---
 
@@ -139,10 +68,6 @@ Contributions are welcome. Read the [wiki](wiki/index.md) to get started. Feel f
 
 This project is licensed under the MIT License.
 
----
-
 ## Author
 
-**learnerforge**
-
-GitHub: https://github.com/learnerforge
+**learnerforge** — https://github.com/learnerforge
