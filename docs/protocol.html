@@ -8,7 +8,7 @@
 <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
 <script>mermaid.initialize({startOnLoad:true,theme:'dark',fontSize:13})</script>
 </head>
-<body>
+<body class="theme-dark">
 <nav>
 <h2>Remote Mouse</h2>
 <ul><li><a href="index.html">Home</a></li>
@@ -21,7 +21,7 @@
 <main>
 <h1>WebSocket Protocol</h1>
 
-<p><strong>Version:</strong> v1.0.0  </p>
+<p><strong>Version:</strong> v1.1.1  </p>
 <p><strong>Last updated:</strong> 2026-06-26</p>
 
 <p>This document describes the WebSocket protocol between the phone browser and the Python server. All events use Socket.IO, which provides WebSocket with automatic HTTP long-polling fallback, reconnection, and event routing.</p>
@@ -441,7 +441,7 @@ def handle_media(data):
         SEND[&quot;POST /api/send-url&lt;br/&gt;→ {success} | {error}&quot;]
         START[&quot;POST /api/setup-start&lt;br/&gt;→ {success} | {error}&quot;]
         STATUS[&quot;GET /api/setup-status&lt;br/&gt;→ {running, done, logs[]}&quot;]
-    end
+    end</pre>
 
 <h3>GET /api/tunnel-url</h3>
 

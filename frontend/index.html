@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Remote Mouse v1.0.0</title>
+<title>Remote Mouse v1.1.1</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200">
 <style>
 :root{
@@ -313,6 +313,7 @@ let sensitivity = 1.0;
 let dragMode = false;
 let touches = {};
 let lastPos = null;
+let touchStartPos = null;
 let touchStartTime = 0;
 let lastMoveTime = 0;
 let touchMoved = false;
@@ -417,8 +418,16 @@ function initSocket(token) {
     if (data.url) updateTunnelUrl(data.url);
   });
 
+  socket.on('pair_error', (data) => {
+    const errEl = document.getElementById('pair-error');
+    if (errEl) errEl.textContent = data && data.message ? data.message : 'Invalid code. Try again.';
+    document.getElementById('pair-input').value = '';
+    document.getElementById('pair-input').focus();
+  });
+
   socket.on('paired', (data) => {
     if (data.token) {
+      document.getElementById('pair-error').textContent = '';
       localStorage.setItem('rm_token', data.token);
       pairingToken = data.token;
       initSocket(data.token);
@@ -453,10 +462,11 @@ function updateTunnelUrl(url) {
   tunnelUrlDisplay.textContent = url;
 }
 
-/* --- Fetch tunnel URL from REST API as fallback --- */
-fetch('/api/tunnel-url').then(r => r.json()).then(data => {
-  if (data.url) updateTunnelUrl(data.url);
-}).catch(() => {});
+/* --- Fetch tunnel URL from REST API as fallback (requires token) --- */
+fetch('/api/tunnel-url', { headers: { 'X-Pairing-Token': pairingToken || '' } })
+  .then(r => r.json()).then(data => {
+    if (data.url) updateTunnelUrl(data.url);
+  }).catch(() => {});
 
 /* --- Copy URL --- */
 copyBtn.addEventListener('click', () => {
@@ -576,6 +586,7 @@ function absPos(t) {
 function resetTouchState() {
   touchpad.classList.remove('dim');
   lastPos = null;
+  touchStartPos = null;
   touchMoved = false;
   touchCursor.classList.remove('show');
   if (longTimer) { clearTimeout(longTimer); longTimer = null; }
@@ -626,6 +637,7 @@ touchpad.addEventListener('touchstart', (e) => {
   if (count === 1) {
     const t = e.changedTouches[0];
     lastPos = { x: t.clientX, y: t.clientY };
+    touchStartPos = { x: t.clientX, y: t.clientY };
     lastMoveTime = Date.now();
     touchStartTime = lastMoveTime;
     touchMoved = false;
@@ -669,6 +681,9 @@ touchpad.addEventListener('touchmove', (e) => {
 
     if (mode === 'mouse') {
       absPos(t);
+      if (touchStartPos && Math.hypot(t.clientX - touchStartPos.x, t.clientY - touchStartPos.y) > 10) {
+        touchMoved = true;
+      }
       lastPos = { x: t.clientX, y: t.clientY };
       touches[t.identifier] = { lastX: t.clientX, lastY: t.clientY };
       return;
@@ -728,7 +743,7 @@ touchpad.addEventListener('touchend', (e) => {
   const remaining = Object.keys(touches).length;
   const now = Date.now();
 
-  if (mode === 'mouse' && e.changedTouches.length === 1 && !touchMoved) {
+  if (mode === 'mouse' && e.changedTouches.length === 1 && !touchMoved && !longFired) {
     const t = e.changedTouches[0];
     const rect = touchpad.getBoundingClientRect();
     doTap(t.clientX - rect.left, t.clientY - rect.top, 'left');

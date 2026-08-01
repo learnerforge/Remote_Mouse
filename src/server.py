@@ -55,6 +55,7 @@ TUNNEL_URL_FILE = os.path.join(PROJECT_ROOT, '.tunnel_url')
 cloudflared_proc = None
 PAIRING_CODE = secrets.token_hex(3)
 paired_sessions = {}
+valid_tokens = set()
 pair_failures = defaultdict(list)
 
 # PII redaction filter
@@ -109,18 +110,19 @@ BLOCKED_KEYS = {
 }
 
 class RateLimiter:
-    def __init__(self, max_calls=30, window=1.0):
+    def __init__(self, max_calls=30, window=1.0, action_limits=None):
         self.max_calls = max_calls
         self.window = window
+        self.action_limits = action_limits or {}
         self._buckets = defaultdict(lambda: defaultdict(list))
 
     def check(self, sid, action):
         now = time.monotonic()
-        key = action
-        dq = self._buckets[sid][key]
+        limit = self.action_limits.get(action, self.max_calls)
+        dq = self._buckets[sid][action]
         while dq and dq[0] < now - self.window:
             dq.pop(0)
-        if len(dq) >= self.max_calls:
+        if len(dq) >= limit:
             return False
         dq.append(now)
         return True
@@ -128,16 +130,15 @@ class RateLimiter:
     def cleanup(self, sid):
         self._buckets.pop(sid, None)
 
-rate_limiter = RateLimiter(max_calls=30, window=1.0)
+rate_limiter = RateLimiter(max_calls=30, window=1.0,
+                           action_limits={'mouse_move': 120, 'mouse_abs': 120, 'scroll': 120})
 
 # REST rate limits (keyed by remote IP)
 rest_limiter = RateLimiter(max_calls=5, window=60)
 setup_limiter = RateLimiter(max_calls=2, window=60)
 
 def pairing_token_valid(token):
-    if not token:
-        return False
-    return any(s.get('token') == token for s in paired_sessions.values())
+    return bool(token) and token in valid_tokens
 
 def validate_action(action):
     if action not in ALLOWED_ACTIONS:
@@ -351,6 +352,9 @@ def static_files(filename):
 
 @app.route('/api/tunnel-url')
 def api_tunnel_url():
+    token = request.args.get('token') or request.headers.get('X-Pairing-Token', '')
+    if not pairing_token_valid(token):
+        return jsonify({'error': 'Not paired'}), 403
     return jsonify({
         'url': get_tunnel_url() or '',
         'local_ip': get_local_ip()
@@ -475,19 +479,14 @@ def require_auth():
 def handle_connect(auth):
     rate_limiter.cleanup(request.sid)
     token = (auth or {}).get('token', '')
-    is_paired = False
-    if token:
-        for s in paired_sessions.values():
-            if s.get('token') == token:
-                is_paired = True
-                break
-        if not is_paired:
-            log_warn("Rejected connection with invalid token")
-            raise ConnectionRefusedError('unauthorized')
+    is_paired = bool(token) and token in valid_tokens
+    if token and not is_paired:
+        log_warn("Rejected connection with invalid token")
+        raise ConnectionRefusedError('unauthorized')
 
     paired_sessions[request.sid] = paired_sessions.get(request.sid, {})
     paired_sessions[request.sid]['connected'] = True
-    if token:
+    if is_paired:
         paired_sessions[request.sid]['token'] = token
         log_ok("Client connected (authenticated)")
         w, h = pyautogui.size()
@@ -512,6 +511,7 @@ def handle_pair(data):
     code = (data or {}).get('code', '').strip().lower()
     if code == PAIRING_CODE:
         token = secrets.token_urlsafe(32)
+        valid_tokens.add(token)
         paired_sessions[sid] = {'token': token, 'paired_at': now, 'connected': True}
         pair_failures.pop(sid, None)
         emit('paired', {'token': token})
@@ -641,10 +641,11 @@ def run_server():
 
     ip = get_local_ip()
     tunnel = get_tunnel_url()
-    log_ok("Remote Mouse v1.0.0 starting on port 5000...")
+    log_ok("Remote Mouse v1.1.1 starting on port 5000...")
     log_info(f"Local: http://{ip}:5000")
     if tunnel:
         log_info(f"Tunnel: {tunnel}")
+    log_ok(f"Pairing code: {PAIRING_CODE}")
     log_ok("WebSocket ready")
     socketio.run(app, host='0.0.0.0', port=5000, debug=False)
 

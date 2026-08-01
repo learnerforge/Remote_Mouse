@@ -8,7 +8,7 @@
 <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
 <script>mermaid.initialize({startOnLoad:true,theme:'dark',fontSize:13})</script>
 </head>
-<body>
+<body class="theme-dark">
 <nav>
 <h2>Remote Mouse</h2>
 <ul><li><a href="index.html" class="active">Home</a></li>
@@ -22,7 +22,7 @@
 <h1>Remote Mouse — Full Reference</h1>
 
 <p><strong>Author:</strong> learnerforge  </p>
-<p><strong>Version:</strong> v1.0.0  </p>
+<p><strong>Version:</strong> v1.1.1  </p>
 <p><strong>License:</strong> MIT</p>
 
 <p>This document is the detailed version of the README. It contains the full Mermaid diagrams, use cases, performance reference, and documentation index that the concise README omits.</p>
@@ -353,10 +353,11 @@ netstat -ano | findstr :5000</code></pre>
 
 <table>
 <tr><th>Version</th><th>Date</th><th>Changes</th></tr>
-<tr><td></td><td></td><td></td></tr>
+<tr><td>v1.1.1</td><td>2026-07-31</td><td>Security hardening (pairing-code endpoint removed, rate limits, lockout)</td></tr>
+<tr><td>v1.1.0</td><td>2026-07-30</td><td>Security release (pairing auth, CORS, rate limiting)</td></tr>
+<tr><td>v1.0.0</td><td>2026-06-26</td><td>DPI presets added (400/800/1600/3200)</td></tr>
 <tr><td>v5.0.1</td><td>2026-06</td><td>Two-finger scroll fix, orphan code cleanup, project restructuring</td></tr>
 <tr><td>v5.0.0</td><td>2026-06</td><td>Initial full release, all core features</td></tr>
-<tr><td>v1.0.0</td><td>Current</td><td>DPI presets added (400/800/1600/3200)</td></tr>
 <tr><td>Planned</td><td>Future</td><td>120 versions across 30 specs — see <code>comparison.html</code></td></tr>
 </table>
 

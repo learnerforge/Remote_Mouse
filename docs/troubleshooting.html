@@ -8,7 +8,7 @@
 <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
 <script>mermaid.initialize({startOnLoad:true,theme:'dark',fontSize:13})</script>
 </head>
-<body>
+<body class="theme-dark">
 <nav>
 <h2>Remote Mouse</h2>
 <ul><li><a href="index.html">Home</a></li>
@@ -21,7 +21,7 @@
 <main>
 <h1>Troubleshooting</h1>
 
-<p><strong>Version:</strong> v1.0.0  </p>
+<p><strong>Version:</strong> v1.1.1  </p>
 <p><strong>Last updated:</strong> 2026-06-26</p>
 
 <p>This document covers common issues, their causes, and how to fix them. If a problem is not listed here, check the server logs (CLI output or <code>events.log</code>) for error messages.</p>
@@ -35,8 +35,8 @@
 <tr><td></td><td></td></tr>
 <tr><td>Page won't load on phone</td><td>Check WiFi / same network / firewall</td></tr>
 <tr><td>"Unauthorized" / "Connection refused"</td><td>Enter the pairing code shown on laptop terminal</td></tr>
-<tr><td>Where is the pairing code?</td><td>It's printed on the terminal when the server starts — a 6-char hex code like <code>A3F9C2</code></td></tr>
-<tr><td>Connection keeps getting rejected?</td><td>The pairing code is valid for 5 minutes; restart the server for a fresh code</td></tr>
+<tr><td>Where is the pairing code?</td><td>It's printed on the terminal when the server starts — a 6-char hex code like <code>a3f9c2</code></td></tr>
+<tr><td>Connection keeps getting rejected?</td><td>Restart the server for a fresh pairing code — it only changes on restart</td></tr>
 <tr><td>WebSocket won't connect</td><td>Check server is running / correct URL</td></tr>
 <tr><td>Mouse moves but lags</td><td>Reduce sensitivity / check network latency</td></tr>
 <tr><td>Clicks not working</td><td>Check server logs / pyautogui permissions</td></tr>
@@ -44,7 +44,7 @@
 <tr><td>Tunnel URL not appearing</td><td>Check cloudflared installed and started</td></tr>
 <tr><td>CLI shows "Server stopped"</td><td>Port in use / check <code>events.log</code></td></tr>
 <tr><td>Two-finger scroll not working</td><td>Use 2 fingers, check scroll zone</td></tr>
-<tr><td>DPI presets not responding</td><td>Check index.html v1.0.0 preset buttons</td></tr>
+<tr><td>DPI presets not responding</td><td>Check the index.html preset buttons</td></tr>
 </table>
 
 <hr>
@@ -99,7 +99,7 @@
 
 <p><strong>Check:</strong></p>
 <ul>
-<li>Terminal should show: <code>OK Remote Mouse v1.0.0 starting on port 5000...</code></li>
+<li>Terminal should show: <code>OK Remote Mouse v1.1.1 starting on port 5000...</code></li>
 <li>Look for Python traceback errors</li>
 <li>Verify with: <code>python -m py_compile src/server.py</code></li>
 </ul>
@@ -591,7 +591,7 @@ subprocess.run([&#x27;xdotool&#x27;, &#x27;mousemove_relative&#x27;, &#x27;--&#x
 <p>Check <code>PROJECT_ROOT/events.log</code> for patterns:</p>
 
 <pre><code># Normal operation
-[19:30:22] OK Remote Mouse v1.0.0 starting on port 5000...
+[19:30:22] OK Remote Mouse v1.1.1 starting on port 5000...
 [19:31:05] OK Client connected
 [19:31:12] INFO move   (+0045, -0023)
 

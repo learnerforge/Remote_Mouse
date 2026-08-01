@@ -18,7 +18,7 @@ except ImportError:
 
 BANNER = f"""
 {Fore.GREEN}+---------------------------------------+
-|       Remote Mouse  v1.0.0            |
+|       Remote Mouse  v1.1.1            |
 |       Terminal Control Panel          |
 +---------------------------------------+{Style.RESET_ALL}
   Type '{Fore.CYAN}help{Style.RESET_ALL}' for commands     '{Fore.YELLOW}q{Style.RESET_ALL}' to quit

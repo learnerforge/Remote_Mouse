@@ -24,7 +24,7 @@ TEMPLATE = '''<!DOCTYPE html>
 <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
 <script>mermaid.initialize({{startOnLoad:true,theme:'dark',fontSize:13}})</script>
 </head>
-<body>
+<body class="theme-dark">
 <nav>
 <h2>Remote Mouse</h2>
 <ul>{nav}</ul>

@@ -8,7 +8,7 @@
 <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
 <script>mermaid.initialize({startOnLoad:true,theme:'dark',fontSize:13})</script>
 </head>
-<body>
+<body class="theme-dark">
 <nav>
 <h2>Remote Mouse</h2>
 <ul><li><a href="index.html">Home</a></li>
@@ -21,7 +21,7 @@
 <main>
 <h1>Configuration Reference</h1>
 
-<p><strong>Version:</strong> v1.0.0  </p>
+<p><strong>Version:</strong> v1.1.1  </p>
 <p><strong>Last updated:</strong> 2026-06-26</p>
 
 <p>This document describes every configuration option in Remote Mouse — environment variables, server settings, frontend tunables, file paths, and customization points.</p>
@@ -379,7 +379,17 @@ cd &quot;$PROJECT_ROOT&quot; || exit 1</code></pre>
 
 <h2>Version-Specific Config</h2>
 
-<h3>v1.0.0 — DPI Presets (Current)</h3>
+<h3>v1.1.1 — Current (2026-07-31)</h3>
+
+<table>
+<tr><th>Feature</th><th>Config Point</th><th>Default</th><th>Location</th></tr>
+<tr><td></td><td></td><td></td><td></td></tr>
+<tr><td>Pairing auth</td><td>6-char code, token auth</td><td>Generated at startup</td><td><code>src/server.py</code></td></tr>
+<tr><td>Rate limits</td><td>30 calls/sec (mouse 120/s)</td><td>Per session/action</td><td><code>src/server.py</code></td></tr>
+<tr><td>Pair lockout</td><td>5 failures / 60s</td><td>Per session</td><td><code>src/server.py</code></td></tr>
+</table>
+
+<h3>v1.0.0 — DPI Presets</h3>
 
 <table>
 <tr><th>Feature</th><th>Config Point</th><th>Default</th><th>Location</th></tr>
@@ -395,7 +405,7 @@ cd &quot;$PROJECT_ROOT&quot; || exit 1</code></pre>
 
 <p>Auto-created at <code>PROJECT_ROOT/.remote_mouse_logs/events.log</code>. All server events with timestamps, passed through <code>PIIRedactFilter</code>:</p>
 
-<pre><code>[19:30:22] OK Remote Mouse v1.0.0 starting on port 5000...
+<pre><code>[19:30:22] OK Remote Mouse v1.1.1 starting on port 5000...
 [19:30:22] INFO Local: http://10.0.0.5:5000
 [19:31:05] OK Client connected (authenticated)
 [19:31:12] INFO move   (+0045, -0023)
